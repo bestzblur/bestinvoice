@@ -1,0 +1,29 @@
+{
+  "name": "bestinvoice",
+  "productName": "Bestinvoice",
+  "version": "1.2.0",
+  "description": "Bestinvoice — receipt, tax invoice, invoice and quotation maker (Thai / English)",
+  "main": "main.js",
+  "author": "Bestinvoice",
+  "license": "UNLICENSED",
+  "scripts": {
+    "start": "electron .",
+    "build:win": "electron-builder --win nsis portable --x64",
+    "build:mac": "electron-builder --mac dmg zip --universal"
+  },
+  "devDependencies": {
+    "electron": "33.4.11",
+    "electron-builder": "25.1.8"
+  },
+  "build": {
+    "appId": "com.bestinvoice.app",
+    "productName": "Bestinvoice",
+    "files": ["main.js", "preload.js", "app/**"],
+    "directories": { "buildResources": "build", "output": "release" },
+    "mac": { "category": "public.app-category.business", "icon": "build/icon.icns", "target": ["dmg", "zip"] },
+    "dmg": { "title": "Bestinvoice" },
+    "win": { "icon": "build/icon.ico", "target": ["nsis", "portable"] },
+    "nsis": { "oneClick": false, "allowToChangeInstallationDirectory": true, "createDesktopShortcut": true, "shortcutName": "Bestinvoice" },
+    "portable": { "artifactName": "Bestinvoice-Portable-${version}.exe" }
+  }
+}

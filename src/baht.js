@@ -1,0 +1,137 @@
+/* Thai baht text — from baht.js v0.7.1 by Manassarn Manoonchai (MIT License)
+   https://github.com/narze/baht.js */
+const BahtJS = (() => {
+const ONE = 'หนึ่ง';
+const TWO = 'สอง';
+const THREE_TO_NINE = ['สาม', 'สี่', 'ห้า', 'หก', 'เจ็ด', 'แปด', 'เก้า'];
+const ED = 'เอ็ด';
+const YEE = 'ยี่';
+const LAN = 'ล้าน';
+const EMPTY = '';
+const DIGIT = [EMPTY, 'สิบ', 'ร้อย', 'พัน', 'หมื่น', 'แสน'];
+const ONES = [EMPTY, ED, TWO, ...THREE_TO_NINE];
+const TENS = [EMPTY, ...[EMPTY, YEE, ...THREE_TO_NINE].map(t => t + DIGIT[1])];
+const SUB_HUNDRED = TENS.flatMap(t => ONES.map(o => t + o));
+SUB_HUNDRED[1] = ONE;
+const SUB_TEN = [EMPTY, ONE, TWO, ...THREE_TO_NINE];
+
+function numberToWords(num) {
+  let output = EMPTY;
+  const length = num.length;
+
+  for (let i = 0; i < length; i++) {
+    const d = num[i];
+    const di = length - i - 1;
+    const diMod = di % 6;
+    const isSib = diMod === 1;
+
+    if (d === '0') {
+      // No-op
+    } else if (isSib && d === '1') {
+      output += DIGIT[diMod];
+    } else if (isSib && d === '2') {
+      output += YEE + DIGIT[diMod];
+    } else if (!diMod && d === '1' && i) {
+      output += ED;
+    } else {
+      output += SUB_TEN[Number(d)] + DIGIT[diMod];
+    }
+
+    if (!diMod && di) {
+      output += LAN;
+    }
+  }
+
+  return output;
+}
+
+function convert(input) {
+  let baht;
+  let bahtStr;
+  let satang;
+  let satangStr;
+  let isNegative = false;
+
+  if (typeof input === 'number') {
+    if (input < 0) {
+      isNegative = true;
+      input = 0 - input;
+    }
+    baht = Math.floor(input);
+    satang = Number.isInteger(input)
+      ? 0
+      : Math.floor(((input + Number.EPSILON * (baht || 1)) * 100) % 100);
+    bahtStr = '' + baht;
+  } else if (typeof input === 'string') {
+    let formattedInput = input.trim();
+
+    if (formattedInput.startsWith('-')) {
+      formattedInput = formattedInput.replace(/^-0+/, '-');
+      if (formattedInput === '-') {
+        // catch "-0" (also catch "-" — consideration needed)
+        formattedInput = '0';
+      }
+    } else {
+      formattedInput = formattedInput.replace(/^0+/, '');
+    }
+
+    let inputNum = Number(formattedInput);
+
+    if (isNaN(inputNum)) {
+      return false;
+    }
+
+    if (inputNum < 0) {
+      isNegative = true;
+      inputNum = 0 - inputNum;
+      formattedInput = formattedInput.slice(1);
+    }
+
+    const inputStr = formattedInput;
+
+    let periodIdx;
+    if (
+      inputStr.includes('.') &&
+      (periodIdx = inputStr.lastIndexOf('.')) !== -1
+    ) {
+      bahtStr = inputStr.slice(0, periodIdx);
+      baht = +bahtStr;
+      satangStr = inputStr.slice(periodIdx + 1);
+      satang = satangStr
+        ? Number(satangStr.slice(0, 2)) *
+          (satangStr.length >= 2 ? 1 : [100, 10][satangStr.length])
+        : 0;
+    } else {
+      baht = inputNum;
+      bahtStr = inputStr;
+      satang = 0;
+    }
+  } else {
+    return false;
+  }
+
+  if (!baht && !satang) {
+    return 'ศูนย์บาทถ้วน';
+  }
+
+  let output = isNegative ? 'ลบ' : EMPTY;
+
+  // Baht
+  output += numberToWords(bahtStr);
+
+  // Satang
+  if (satang) {
+    if (baht) output += 'บาท';
+
+    // Faster!
+    output += SUB_HUNDRED[satang] + 'สตางค์';
+    // output += numberToWords(satang.toString()) + 'สตางค์';
+  } else {
+    output += 'บาทถ้วน';
+  }
+
+  return output;
+}
+
+return { convert };
+})();
