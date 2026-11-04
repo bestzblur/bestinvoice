@@ -20,7 +20,7 @@ function fmtDate(iso, lang, style = 'short') {
   if (!iso) return '';
   const [y, m, d] = iso.split('-').map(Number);
   const be = S.settings.buddhistYear;
-  if (style === 'long') { const dd = String(d).padStart(2, '0'); return lang === 'en' ? `${dd} ${EN_FULL[m - 1]} ${be ? y + 543 : y}` : `${dd} ${TH_FULL[m - 1]} ${be ? y + 543 : y}`; }
+  if (style === 'long') { const dd = String(d); return lang === 'en' ? `${dd} ${EN_FULL[m - 1]} ${be ? y + 543 : y}` : `${dd} ${TH_FULL[m - 1]} ${be ? y + 543 : y}`; }
   if (style === 'num') return `${String(d).padStart(2,'0')}/${String(m).padStart(2,'0')}/${lang === 'en' && !be ? y : (be ? y + 543 : y)}`;
   if (lang === 'en') return `${d} ${EN_MONTHS[m - 1]} ${be ? y + 543 : y}`;
   return `${d} ${TH_MONTHS[m - 1]} ${be ? y + 543 : y}`;
@@ -274,17 +274,17 @@ const PRESET_DEFS = {
 /* Thai receipt-book layout for hotels / guesthouses, A5 landscape (210 × 148 mm) */
 function hotelReceiptBook() {
   return [
-    B('company', 14, 9, 77, 27, { size: 7.8, nameSize: 11, showEn: false, showAddress: true, showTaxId: true, showContact: true, fit: true, font: 'kanit' }),
-    B('logo', 93, 8, 24, 24),
-    B('title', 128, 9, 68, 11, { size: 16, bold: true, align: 'right', copyTag: false, fit: true }),
-    B('docinfo', 148, 22, 48, 10, { size: 8.5, boldLabels: true, showDue: false, showRef: false }),
-    B('customer', 14, 38, 112, 19, { size: 8.5, book: true, fit: true }),
-    B('extra', 148, 37, 48, 20, { size: 8.5, darkLabels: true, fit: true }),
-    B('items', 14, 59, 182, 52, { size: 8.5, headerBg: 'accent', headerText: '#1D2128', showNo: true, showUnit: false, stayQty: true, bahtCol: true, book: true, nightWord: 'วัน', hideNights: true }),
-    B('totals', 54, 113, 142, 9, { size: 9, variant: 'box', attach: 'items' }),
-    B('qr', 14, 124, 15, 19, { caption: true }),
-    B('notes', 32, 126, 100, 12, { size: 7.5 }),
-    B('signature', 146, 125, 50, 15, { size: 9, variant: 'line', count: 1, labels: ['receiver', 'ผู้จัดการ'], useSig: true })
+    B('company', 12, 8, 82, 30, { size: 9.5, nameSize: 13.5, showEn: false, showAddress: true, showTaxId: true, showContact: true, fit: true, font: 'kanit' }),
+    B('logo', 96, 7, 26, 26),
+    B('title', 126, 8, 72, 12, { size: 20, bold: true, align: 'right', copyTag: false, fit: true }),
+    B('docinfo', 142, 22, 56, 11, { size: 10.5, boldLabels: true, showDue: false, showRef: false }),
+    B('customer', 12, 40, 122, 21, { size: 10.5, book: true, fit: true }),
+    B('extra', 142, 36, 56, 24, { size: 10.5, darkLabels: true, fit: true }),
+    B('items', 12, 62, 186, 51, { size: 10.5, headerBg: 'accent', headerText: '#1D2128', showNo: true, showUnit: false, stayQty: true, bahtCol: true, book: true, nightWord: 'วัน', hideNights: true, autoSize: true }),
+    B('totals', 48, 114, 150, 10, { size: 11, variant: 'box', attach: 'items' }),
+    B('qr', 12, 122, 16, 21, { caption: true }),
+    B('notes', 31, 125, 100, 13, { size: 9 }),
+    B('signature', 142, 124, 56, 16, { size: 11, variant: 'line', count: 1, labels: ['receiver', 'ผู้จัดการ'], useSig: true })
   ];
 }
 const presetName = k => (PRESET_DEFS[k] ? (LANG === 'en' ? PRESET_DEFS[k].en : PRESET_DEFS[k].th) : k);
@@ -384,6 +384,14 @@ function migrate() {
     for (const tp of S.templates) if (tp.preset === 'hotel' && tp.style === 'book') {
       const n = makeTemplate('hotel'); const keepFont = tp.font, keepAccent = tp.accent;
       Object.assign(tp, { blocks: n.blocks, extraFields: n.extraFields, font: keepFont || n.font, accent: keepAccent || n.accent });
+    }
+    save();
+  }
+  if (!S.migrations.hotelV5) { // larger, readable print sizes + auto-sizing table
+    S.migrations.hotelV5 = 1;
+    for (const tp of S.templates) if (tp.preset === 'hotel' && tp.style === 'book') {
+      const n = makeTemplate('hotel'); Object.assign(tp, { blocks: n.blocks, font: tp.font || n.font, accent: tp.accent || n.accent, base: n.base });
+      for (const f of tp.extraFields || []) if (f.type === 'nights') delete f.hidePrint;
     }
     save();
   }

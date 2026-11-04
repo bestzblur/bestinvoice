@@ -444,3 +444,6 @@ input[type=color].inp{padding:3px;height:34px;cursor:pointer}
 .sheet .page{flex:none;box-shadow:none!important}
 .sheet.col .cutline{border-top:.25mm dashed #b5b5b5;width:100%;flex:none}
 .sheet.row .cutline{border-left:.25mm dashed #b5b5b5;height:100%;flex:none}
+.page table.it.book.roomy td{padding-top:2.6mm;padding-bottom:1.4mm}
+.page table.it.book.roomy th{padding-top:1.6mm;padding-bottom:1.6mm}
+.page table.it td:not(.d){white-space:nowrap}

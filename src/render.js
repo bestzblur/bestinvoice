@@ -127,13 +127,13 @@ function renderBlock(b, ctx) {
       if (p.bahtCol) cols.push(['baht', 'c', '10mm']);
       const M = ctx.M, nw = p.nightWord || (lang === 'en' ? 'nights' : 'คืน');
       const thLab = k => k === 'baht' ? '' : (p.stayQty && k === 'price' ? (lang === 'en' ? 'Unit price' : lang === 'th' ? 'หน่วยละ' : 'หน่วยละ<small>Unit price</small>') : p.stayQty && k === 'amount' ? (lang === 'en' ? 'Amount' : lang === 'th' ? 'รวมเป็นเงิน' : 'รวมเป็นเงิน<small>Amount</small>') : L2(k, lang));
-      let h = `<table class="it${p.book ? ' book' : ''}${ctx.tableScale < 1 ? ' tight' : ''}" style="${p.book ? `border-bottom:.6mm solid ${hb};` : ''}${ctx.tableScale < 1 ? `font-size:${ctx.tableScale}em;` : ''}"><thead><tr style="${p.book ? '' : `background:${hb};`}color:${ht}">` + cols.map(c => `<th class="${p.book && c[0] !== 'amount' ? 'c' : c[1]}" style="${c[2] ? 'width:' + c[2] + ';' : ''}${bd}${p.book ? `background:${hb};` : ''}">${thLab(c[0])}</th>`).join('') + `</tr></thead><tbody>`;
+      let h = `<table class="it${p.book ? ' book' : ''}${ctx.tableScale < 1 ? ' tight' : ctx.tableScale > 1 ? ' roomy' : ''}" style="${p.book ? `border-bottom:.6mm solid ${hb};` : ''}${ctx.tableScale !== 1 ? `font-size:${ctx.tableScale}em;` : ''}"><thead><tr style="${p.book ? '' : `background:${hb};`}color:${ht}">` + cols.map(c => `<th class="${p.book && c[0] !== 'amount' ? 'c' : c[1]}" style="${c[2] ? 'width:' + c[2] + ';' : ''}${bd}${p.book ? `background:${hb};` : ''}">${thLab(c[0])}</th>`).join('') + `</tr></thead><tbody>`;
       const rows = items.map((it, i) => {
         const q = money(it.qty, num(it.qty) % 1 ? 2 : 0);
         const nTxt = !p.hideNights && it.nights !== undefined && it.nights !== '' ? `${money(it.nights, 0)} ${esc(nw)}` : '';
         const qtyCell = p.stayQty ? `${q}${it.unit ? ' ' + esc(it.unit) : ''}${nTxt ? (ctx.tableInline ? ` · ${nTxt}` : `<div style="margin-top:1.2mm">${nTxt}</div>`) : ''}` : q;
         const cell = { idx: (ctx.rowOffset || 0) + i + 1, desc: nl2br(it.desc), qty: qtyCell, baht: lang === 'en' ? 'THB' : 'บาท', unit: esc(it.unit), nights: (it.nights !== undefined && it.nights !== '') ? money(it.nights, 0) : '', price: M(it.price), disc: num(it.discount) ? M(it.discount) : '', amount: M(lineAmount(it)) };
-        return `<tr style="${p.striped && i % 2 ? 'background:#F6F7F9' : ''}">` + cols.map(c => `<td class="${p.book && c[0] !== 'amount' ? 'c' : c[1]}" style="${bd}${p.book ? 'border-bottom:0;' : ''}">${cell[c[0]]}</td>`).join('') + '</tr>';
+        return `<tr style="${p.striped && i % 2 ? 'background:#F6F7F9' : ''}">` + cols.map(c => `<td class="${p.book && c[0] !== 'amount' ? 'c' : c[1]}${c[0] === 'desc' ? ' d' : ''}" style="${bd}${p.book ? 'border-bottom:0;' : ''}">${cell[c[0]]}</td>`).join('') + '</tr>';
       });
       for (let i = items.length; i < (ctx.rowOffset ? 0 : (ctx.fillTo !== undefined ? Math.min(ctx.fillTo, p.minRows || 0) : (p.minRows || 0))); i++) rows.push('<tr>' + cols.map(() => `<td style="${bd}">&nbsp;</td>`).join('') + '</tr>');
       return h + rows.join('') + '</tbody></table>';
@@ -328,6 +328,16 @@ function buildPages(container, doc, tpl, opts = {}) {
       need = p2.querySelector('.items-blk').firstElementChild.offsetHeight;
       if (need <= maxLast) { applyFlow(container.firstElementChild); return 1; }
     }
+  }
+  if (need <= maxLast && itB.p.autoSize && !itB.p.minRows) {
+    // few items: make the table bigger, largest size that still fits the page
+    for (const sc of [1.32, 1.24, 1.16, 1.08]) {
+      container.innerHTML = renderPage(doc, tpl, { ...opts, tableScale: sc });
+      const p2 = container.firstElementChild; applyFlow(p2, { design: true });
+      if (p2.querySelector('.items-blk').firstElementChild.offsetHeight <= maxLast) { applyFlow(p2); return 1; }
+    }
+    container.innerHTML = renderPage(doc, tpl, opts);
+    applyFlow(container.firstElementChild); return 1;
   }
   if (need <= maxLast) {
     if (itB.p.minRows) { // add empty ruled rows only as far as the space allows
