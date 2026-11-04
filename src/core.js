@@ -50,16 +50,22 @@ function englishText(amount) {
 const isNightly = unit => /คืน|night/i.test(String(unit || ''));
 const nightsOf = it => (it.nights !== undefined && it.nights !== '' && num(it.nights) > 0) ? num(it.nights) : 1;
 function lineAmount(it) { return r2(num(it.qty) * num(it.price) * nightsOf(it) - num(it.discount)); }
+function discountsOf(doc) { return Array.isArray(doc.discounts) ? doc.discounts : (num(doc.discount) ? [{ type: 'amount', value: num(doc.discount), label: '' }] : []); }
 function calcDoc(doc) {
   const rate = num(doc.vatRate ?? S.settings.vatRate);
   const subtotal = r2((doc.items || []).reduce((a, it) => a + lineAmount(it), 0));
-  const discount = r2(num(doc.discount));
-  const afterDiscount = r2(subtotal - discount);
+  // bill discounts: a list of % or ฿ lines applied in order (none by default)
+  let run = subtotal; const discounts = [];
+  for (const dc of discountsOf(doc)) {
+    const v = num(dc.value); const amt = r2(dc.type === 'percent' ? run * v / 100 : v);
+    if (!amt) continue; discounts.push({ label: dc.label || '', type: dc.type, value: v, amount: amt }); run = r2(run - amt);
+  }
+  const discount = r2(subtotal - run), afterDiscount = run;
   let vat = 0, beforeVat = afterDiscount, total = afterDiscount;
   if (doc.vatMode === 'exclusive') { vat = r2(afterDiscount * rate / 100); total = r2(afterDiscount + vat); }
   else if (doc.vatMode === 'inclusive') { beforeVat = r2(afterDiscount * 100 / (100 + rate)); vat = r2(afterDiscount - beforeVat); }
   const wht = r2(beforeVat * num(doc.whtRate) / 100);
-  return { rate, subtotal, discount, afterDiscount, beforeVat, vat, total, wht, net: r2(total - wht) };
+  return { rate, subtotal, discount, discounts, afterDiscount, beforeVat, vat, total, wht, net: r2(total - wht) };
 }
 
 /* ---------- readable data fields (used in free-text blocks) ---------- */

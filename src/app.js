@@ -282,15 +282,15 @@ function viewEditor(c) {
             <div class="grid g3"><label class="field"><span>${t('taxId')}</span><input class="inp" data-f="customer.taxId" value="${esc(d.customer.taxId)}" inputmode="numeric"></label><label class="field"><span>${t('branch')}</span><input class="inp" data-f="customer.branch" value="${esc(d.customer.branch)}" placeholder="${t('headOffice')}"></label><label class="field"><span>${t('phone')}</span><input class="inp" data-f="customer.phone" value="${esc(d.customer.phone)}"></label></div>
           </div></div>
         <div class="card card-b sec"><h4><span class="n">3</span>${t('s3')}</h4>
-          <table class="items"><thead><tr><th></th><th>${t('desc')}</th><th style="width:70px">${hasStay ? t('qtyRooms') : t('qty')}</th>${hasStay ? `<th style="width:60px">${t('nightsCol')}</th>` : ''}<th style="width:70px">${t('unit')}</th><th style="width:100px">${t('price')}</th><th style="width:80px">${t('disc')}</th><th style="width:96px;text-align:right">${t('lineTotal')}</th><th style="width:30px"></th></tr></thead>
-          <tbody id="items-body">${d.items.map((it, i) => `<tr draggable="true" data-row="${i}"><td class="h" title="${t('dragToSort')}">${ico('grip', 16)}</td>
-            <td><textarea class="inp" rows="1" list="dl-products" data-it="${i}" data-k="desc" data-grow placeholder="${t('desc')}">${esc(it.desc)}</textarea></td>
-            <td><input class="inp sm num" data-it="${i}" data-k="qty" value="${it.qty}" inputmode="decimal"></td>${hasStay ? `<td><input class="inp sm num" data-it="${i}" data-k="nights" value="${it.nights ?? ''}" placeholder="–" inputmode="numeric" title="${esc(t('roomCalc'))}"></td>` : ''}
-            <td><input class="inp sm" data-it="${i}" data-k="unit" value="${esc(it.unit)}"></td>
-            <td><input class="inp sm num" data-it="${i}" data-k="price" value="${it.price}" inputmode="decimal"></td>
-            <td><input class="inp sm num" data-it="${i}" data-k="discount" value="${it.discount || ''}" inputmode="decimal" placeholder="0"></td>
-            <td class="amt" data-amt="${i}">${money(lineAmount(it))}</td>
-            <td><button class="menu-btn" data-act="eddelitem" data-i="${i}" title="${t('removeItem')}">${ico('x', 16)}</button></td></tr>`).join('')}</tbody></table>
+          <div class="irows" id="items-body">${d.items.map((it, i) => { const nightly = hasStay && isNightly(it.unit); return `<div class="irow" data-row="${i}">
+            <span class="h" title="${t('dragToSort')}">${ico('grip', 16)}</span>
+            <textarea class="inp desc" rows="1" list="dl-products" data-it="${i}" data-k="desc" data-grow placeholder="${t('desc')}">${esc(it.desc)}</textarea>
+            <button class="menu-btn del" data-act="eddelitem" data-i="${i}" title="${t('removeItem')}">${ico('x', 16)}</button>
+            <label class="mini"><small>${nightly ? t('qtyRooms') : t('qty')}</small><input class="inp sm num" data-it="${i}" data-k="qty" value="${it.qty}" inputmode="decimal"></label>
+            <label class="mini"><small>${t('unit')}</small><input class="inp sm" data-it="${i}" data-k="unit" value="${esc(it.unit)}"></label>
+            <label class="mini"><small>${t('price')}</small><input class="inp sm num" data-it="${i}" data-k="price" value="${it.price}" inputmode="decimal"></label>
+            <div class="amt"><small>${t('lineTotal')}</small><b data-amt="${i}">${money(lineAmount(it))}</b>${nightly ? `<em data-nh="${i}">× ${nightsOf(it)} ${t('nightsCol')}</em>` : ''}</div>
+          </div>`; }).join('')}</div>
           <datalist id="dl-products">${S.products.map(p => `<option value="${esc(p.name)}">${money(p.price)} / ${esc(p.unit)}</option>`).join('')}</datalist>
           <button class="btn sm" data-act="edadditem" style="margin-top:6px">${ico('plus', 15)}${t('addItem')}</button>
           <div class="qa"><div class="qa-h"><span>${ico('sparkle', 14)} ${t('quickAdd')}</span>${S.products.length > 8 ? `<input class="inp sm" id="qa-filter" placeholder="${esc(t('filterProducts'))}" style="width:170px">` : ''}</div>
@@ -300,7 +300,8 @@ function viewEditor(c) {
           <div class="grid g2">
             <label class="field"><span>${t('vatMode')}</span><select class="inp" data-f="vatMode">${sel([['exclusive', t('vatEx') + ` (${S.settings.vatRate}%)`], ['inclusive', t('vatIn') + ` (${S.settings.vatRate}%)`], ['none', t('vatNone')]], d.vatMode)}</select></label>
             <label class="field"><span>${t('whtRate')}</span><select class="inp" data-f="whtRate">${sel([[0, t('none')], [1, '1%'], [2, '2%'], [3, '3%'], [5, '5%']], d.whtRate)}</select></label>
-            <label class="field"><span>${t('discountBill')} (฿)</span><input class="inp num" data-f="discount" value="${d.discount || ''}" placeholder="0" inputmode="decimal"></label>
+            <div class="field" style="grid-column:1/-1"><span>${t('discountBill')}</span><div id="disc-list">${discountRows(d)}</div>
+              <div><button class="btn sm" data-act="eddiscadd" style="margin-top:6px">${ico('plus', 15)}${t('addDiscount')}</button></div></div>
             <label class="field"><span>${t('payMethod')}</span><select class="inp" data-f="payMethod">${sel([['', '—'], ['cash', t('cash')], ['transfer', t('transfer')], ['cheque', t('cheque')], ['card', t('card')]], d.payMethod)}</select></label>
             <label class="field" style="grid-column:1/-1"><span>${t('notes')}</span><textarea class="inp" rows="2" data-f="notes" data-grow>${esc(d.notes)}</textarea></label>
           </div>
@@ -322,10 +323,27 @@ function viewEditor(c) {
   wireItemDrag();
 }
 function autoGrow(el) { el.style.height = 'auto'; el.style.height = el.scrollHeight + 2 + 'px'; }
+function discountRows(d) {
+  const list = discountsOf(d);
+  if (!list.length) return `<div class="disc-none">${t('noDiscount')}</div>`;
+  return list.map((dc, i) => `<div class="disc-row"><input class="inp sm" data-dc="${i}" data-dk="label" value="${esc(dc.label || '')}" placeholder="${esc(t('disc'))}">
+    <div class="seg"><button data-act="eddisctype" data-i="${i}" data-v="percent" class="${dc.type === 'percent' ? 'on' : ''}">%</button><button data-act="eddisctype" data-i="${i}" data-v="amount" class="${dc.type !== 'percent' ? 'on' : ''}">฿</button></div>
+    <input class="inp sm num" data-dc="${i}" data-dk="value" value="${dc.value || ''}" placeholder="0" inputmode="decimal">
+    <span class="dc-amt" data-dcamt="${i}">−${money(discAmount(d, i))}</span>
+    <button class="menu-btn" data-act="eddiscdel" data-i="${i}" title="${esc(t('delete'))}">${ico('x', 16)}</button></div>`).join('');
+}
+function discAmount(d, i) { // amount of discount line i after the lines before it
+  const sub = calcDoc({ ...d, discounts: discountsOf(d).slice(0, i), vatMode: 'none', whtRate: 0 }).afterDiscount; const dc = discountsOf(d)[i];
+  return r2(dc.type === 'percent' ? sub * num(dc.value) / 100 : num(dc.value));
+}
+function ensureDiscList(d) { if (!Array.isArray(d.discounts)) { d.discounts = discountsOf(d).map(x => ({ ...x })); d.discount = 0; } return d.discounts; }
 function updateEditorTotals() {
   const d = UI.ed.doc, k = calcDoc(d);
   const rows = [[t('subtotal'), k.subtotal]];
-  if (k.discount) rows.push([t('discountBill'), -k.discount], [t('afterDiscount'), k.afterDiscount]);
+  for (const dc of k.discounts) rows.push([(dc.label || t('disc')) + (dc.type === 'percent' ? ` ${dc.value}%` : ''), -dc.amount]);
+  if (k.discount) rows.push([t('afterDiscount'), k.afterDiscount]);
+  discountsOf(d).forEach((dc, i) => { const el = $(`[data-dcamt="${i}"]`); if (el) el.textContent = '−' + money(discAmount(d, i)); });
+  d.items.forEach((it, i) => { const nh = $(`[data-nh="${i}"]`); if (nh) nh.textContent = `× ${nightsOf(it)} ${t('nightsCol')}`; });
   if (d.vatMode === 'inclusive') rows.push([t('beforeVat'), k.beforeVat]);
   if (d.vatMode !== 'none') rows.push([`${t('vat')} ${k.rate}%`, k.vat]);
   let h = rows.map(r => `<span>${esc(r[0])}</span><span class="r">${money(r[1])}</span>`).join('');
@@ -352,12 +370,12 @@ function renderPreview(now) {
 function setPath(obj, path, val) { const ks = path.split('.'); let o = obj; while (ks.length > 1) o = o[ks.shift()]; o[ks[0]] = val; }
 function wireItemDrag() {
   const body = $('#items-body'); if (!body) return; let from = null;
-  body.addEventListener('dragstart', e => { const tr = e.target.closest && e.target.closest('tr'); if (!tr) return; from = +tr.dataset.row; tr.classList.add('drag'); e.dataTransfer.effectAllowed = 'move'; e.dataTransfer.setData('text/plain', 'row'); });
-  body.addEventListener('dragover', e => { e.preventDefault(); $$('tr.over', body).forEach(x => x.classList.remove('over')); const tr = e.target.closest('tr'); if (tr) tr.classList.add('over'); });
-  body.addEventListener('dragend', () => $$('tr', body).forEach(x => x.classList.remove('drag', 'over')));
-  body.addEventListener('drop', e => { e.preventDefault(); const tr = e.target.closest('tr'); if (!tr || from === null) return; const to = +tr.dataset.row; const items = UI.ed.doc.items; const [m] = items.splice(from, 1); items.splice(to, 0, m); from = null; touchDoc(); renderView(); });
+  body.addEventListener('dragstart', e => { const r = e.target.closest && e.target.closest('.irow'); if (!r) return; from = +r.dataset.row; r.classList.add('drag'); e.dataTransfer.effectAllowed = 'move'; e.dataTransfer.setData('text/plain', 'row'); });
+  body.addEventListener('dragover', e => { e.preventDefault(); $$('.irow.over', body).forEach(x => x.classList.remove('over')); const r = e.target.closest('.irow'); if (r) r.classList.add('over'); });
+  body.addEventListener('dragend', () => $$('.irow', body).forEach(x => x.classList.remove('drag', 'over')));
+  body.addEventListener('drop', e => { e.preventDefault(); const r = e.target.closest('.irow'); if (!r || from === null) return; const to = +r.dataset.row; const items = UI.ed.doc.items; const [m] = items.splice(from, 1); items.splice(to, 0, m); from = null; touchDoc(); renderView(); });
   // only allow dragging from the grip handle
-  $$('tr', body).forEach(tr => { tr.draggable = false; const h = tr.querySelector('.h'); h.addEventListener('mousedown', () => tr.draggable = true); tr.addEventListener('dragend', () => tr.draggable = false); });
+  $$('.irow', body).forEach(r => { r.draggable = false; r.querySelector('.h').addEventListener('mousedown', () => r.draggable = true); r.addEventListener('dragend', () => r.draggable = false); });
 }
 function convertDoc(d, type) {
   const n = clone(d); n.id = uid(); n.type = type; n.date = todayISO(); n.number = nextNumber(type, n.date); n.createdAt = Date.now();
@@ -442,7 +460,7 @@ function viewSettings(c) {
       <label class="field" style="max-width:320px"><span>${t('uiFont')}</span><select class="inp" data-uifont>${sel(Object.keys(FONTS).map(k => [k, FONT_LABELS[k]]), S.settings.uiFont || 'plex')}</select></label>
       <div class="field"><span>${t('uiLang')}</span><div class="seg" style="align-self:flex-start"><button data-act="lang" data-v="th" class="${LANG === 'th' ? 'on' : ''}">ไทย</button><button data-act="lang" data-v="en" class="${LANG === 'en' ? 'on' : ''}">English</button></div></div>
       <div class="field"><span>${t('backup')}</span><small>${t('backupHint')}</small><div style="display:flex;gap:10px;flex-wrap:wrap;margin-top:6px"><button class="btn" data-act="export">${ico('download', 16)}${t('exportBackup')}</button><button class="btn" data-act="import">${ico('upload', 16)}${t('importBackup')}</button><button class="btn" data-act="sample">${ico('sparkle', 16)}${t('loadSample')}</button>${window.bestinvoiceNative ? `<button class="btn" data-act="openbackups">${ico('layers', 16)}${LANG === 'th' ? 'เปิดโฟลเดอร์สำรองอัตโนมัติ' : 'Open auto-backup folder'}</button>` : ''}<button class="btn danger" data-act="reset">${ico('trash', 16)}${t('resetAll')}</button></div></div>
-      <div class="hint">Bestinvoice 1.3 · macOS · Windows · ${LANG === 'th' ? 'ใช้งานได้แบบออฟไลน์' : 'Works offline'}</div>
+      <div class="hint">Bestinvoice 1.4 · macOS · Windows · ${LANG === 'th' ? 'ใช้งานได้แบบออฟไลน์' : 'Works offline'}</div>
     </div></div>
   </div>`;
   $$('[data-grow]', c).forEach(autoGrow);
@@ -465,6 +483,9 @@ const ACT = {
   vfcheck: () => showVerify($('#vf-text').value),
   vfcam: () => scanFromCamera(),
   vfimg: async () => { const f = await pickFile('image/*'); if (f) scanFromImage(f); },
+  eddiscadd: () => { const d = UI.ed.doc; ensureDiscList(d).push({ type: 'percent', value: '', label: '' }); touchDoc(); $('#disc-list').innerHTML = discountRows(d); const v = $$('#disc-list [data-dk="value"]'); v[v.length - 1].focus(); updateEditorTotals(); renderPreview(); },
+  eddiscdel: el => { const d = UI.ed.doc; ensureDiscList(d).splice(+el.dataset.i, 1); touchDoc(); $('#disc-list').innerHTML = discountRows(d); updateEditorTotals(); renderPreview(); },
+  eddisctype: el => { const d = UI.ed.doc; ensureDiscList(d)[+el.dataset.i].type = el.dataset.v; touchDoc(); $('#disc-list').innerHTML = discountRows(d); updateEditorTotals(); renderPreview(); },
   edaddcust: () => addCustomerFromDoc(),
   edaddprod: el => addProductToDoc(S.products.find(p => p.id === el.dataset.id)),
   ednewprod: () => editProduct(null, p => { addProductToDoc(p); }),
@@ -527,6 +548,10 @@ document.addEventListener('input', e => {
   const el = e.target;
   if (el.matches('[data-grow]')) autoGrow(el);
   if (el.id === 'qa-filter') { $('#qa-chips').innerHTML = productChips(el.value); return; }
+  if (el.dataset.dc !== undefined && UI.ed) {
+    const d = UI.ed.doc, dc = ensureDiscList(d)[+el.dataset.dc]; dc[el.dataset.dk] = el.dataset.dk === 'value' ? (el.value.trim() === '' ? '' : num(el.value)) : el.value;
+    touchDoc(); updateEditorTotals(); renderPreview(); return;
+  }
   if (el.dataset.ex !== undefined && UI.ed) {
     const d = UI.ed.doc, tp = templateFor(d); d.extra = d.extra || {}; d.extra[el.dataset.ex] = el.value;
     if (['checkin', 'nights', 'checkout', 'rooms'].includes(el.dataset.extype)) {

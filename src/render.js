@@ -129,7 +129,8 @@ function renderBlock(b, ctx) {
     }
     case 'totals': {
       const rows = [[L('subtotal', lang), calc.subtotal]];
-      if (calc.discount) rows.push([L('discount', lang), -calc.discount], [L('afterDiscount', lang), calc.afterDiscount]);
+      for (const dc of calc.discounts || []) rows.push([(dc.label || L('discount', lang)) + (dc.type === 'percent' ? ` ${money(dc.value, dc.value % 1 ? 2 : 0)}%` : ''), -dc.amount]);
+      if (calc.discount) rows.push([L('afterDiscount', lang), calc.afterDiscount]);
       if (doc.vatMode === 'inclusive') rows.push([L('beforeVat', lang), calc.beforeVat]);
       if (doc.vatMode !== 'none') rows.push([`${L('vat', lang)} ${calc.rate}%`, calc.vat]);
       const hl = resolveColor(p.highlight, tpl);
