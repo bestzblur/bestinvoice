@@ -161,7 +161,7 @@ function dProps() {
       <div class="prop-row">${field(t('stroke'), color('data-pp', 'stroke', p.stroke, '#d0d5db'))}${field(t('thickness'), numIn('data-pp', 'thickness', p.thickness ?? .3, .1))}</div>
       ${p.kind !== 'line' ? `<div class="prop-row">${field(t('fill'), color('data-pp', 'fill', p.fill, '#f1f8f6'))}${field(t('radius'), numIn('data-pp', 'radius', p.radius || 0, .5))}</div>${tog('accentFill', LANG === 'th' ? 'ใช้สีหลักเป็นสีเติม' : 'Fill with accent color', p.accentFill)}` : tog('dashed', LANG === 'th' ? 'เส้นประ' : 'Dashed', p.dashed)}`; break;
     case 'image': spec = `<button class="btn sm" data-act="dimg">${ico('upload', 15)}${t('chooseImage')}</button>`; break;
-    case 'qr': spec = `<label class="switch" style="margin-bottom:8px;font-size:12.5px"><input type="checkbox" data-dsqr ${S.settings.showQR !== false ? 'checked' : ''}><i></i>${t('showQR')}</label>${tog('caption', t('showCaption'), p.caption !== false)}<div class="hint" style="margin-bottom:8px">${t('qrHowTo')}</div><div class="hint">${t('verifyHint')}</div>`; break;
+    case 'qr': spec = `<label class="switch" style="margin-bottom:8px;font-size:12.5px"><input type="checkbox" data-dsqr ${S.settings.showQR !== false ? 'checked' : ''}><i></i>${t('showQR')}</label>${tog('caption', t('showCaption'), p.caption !== false)}<div class="hint">${t('qrHowTo')}</div>`; break;
     case 'logo': spec = `<div class="hint">${LANG === 'th' ? 'เปลี่ยนโลโก้ได้ที่หน้า ตั้งค่า › ข้อมูลบริษัท' : 'Change the logo in Settings › Company'}</div>`; break;
   }
   P.innerHTML = `<h5>${t('properties')}</h5>

@@ -432,6 +432,15 @@ function migrate() {
     for (const tp of S.templates) if (tp.preset === 'hotel') tp.intMoney = false;
     save();
   }
+  if (!S.migrations.titleAlign) { // title never runs past the table's right edge; it shrinks to fit
+    S.migrations.titleAlign = 1;
+    for (const tp of S.templates) {
+      const it = tp.blocks.find(x => x.type === 'items'), ti = tp.blocks.find(x => x.type === 'title');
+      if (!ti) continue; ti.p = ti.p || {}; ti.p.fit = true;
+      if (it && ti.y < it.y) { const R = it.x + it.w; if (ti.x + ti.w > R + .5 && ti.x < R - 10) ti.w = +(R - ti.x).toFixed(1); }
+    }
+    save();
+  }
 }
 let saveTimer = null;
 function save() {

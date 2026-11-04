@@ -139,6 +139,7 @@ function renderBlock(b, ctx) {
       return h + rows.join('') + '</tbody></table>';
     }
     case 'totals': {
+      const unitW = lang === "en" ? "THB" : "บาท", mu = v => `${money(v)}<span class="u">${unitW}</span>`;
       if (p.variant === 'box') {
         const M = ctx.M, pre = [];
         for (const dc of calc.discounts || []) pre.push([(dc.label || L('discount', lang)) + (dc.type === 'percent' ? ` ${dc.value}%` : ''), -dc.amount]);
@@ -146,9 +147,10 @@ function renderBlock(b, ctx) {
         else if (pre.length) pre.unshift([L('subtotal', lang), calc.subtotal]);
         const words = lang === 'en' ? englishText(calc.total) : bahtText(calc.total);
         let h = `<div style="display:flex;flex-direction:column">`;
-        if (pre.length) h += `<div class="tt" style="margin-left:auto;width:62%;margin-bottom:1mm;font-size:.92em;gap:.4mm 4mm">${pre.map(r => `<span class="k">${esc(r[0])}</span><span class="r">${M(r[1])}</span>`).join('')}</div>`;
-        h += `<div class="sumbox"><b>${lang === 'en' ? 'Amount' : 'จำนวนเงิน'}</b><b class="sw">${esc(words)}</b><b>${lang === 'en' ? 'Total' : 'รวมเงิน'}</b><b class="sv">${M(calc.total)}</b><b>${lang === 'en' ? 'THB' : 'บาท'}</b></div>`;
-        if (calc.wht) h += `<div style="display:flex;justify-content:flex-end;gap:5mm;margin-top:1mm;font-size:.92em"><span><span class="k">${esc(L('wht', lang))} ${num(doc.whtRate)}%</span> ${M(-calc.wht)}</span><b>${esc(L('net', lang))} ${M(calc.net)}</b></div>`;
+        const U = `<span class="u">${unitW}</span>`;
+        if (pre.length) h += `<div class="sumrows" style="margin-bottom:1mm">${pre.map(r => `<span class="k">${esc(r[0])}</span><span class="r">${M(r[1])}</span>${U}`).join('')}</div>`;
+        h += `<div class="sumbox"><b>${lang === 'en' ? 'Amount' : 'จำนวนเงิน'}</b><b class="sw">${esc(words)}</b><b>${lang === 'en' ? 'Total' : 'รวมเงิน'}</b><b class="sv">${M(calc.total)}</b><b class="u">${unitW}</b></div>`;
+        if (calc.wht) h += `<div class="sumrows" style="margin-top:1mm"><span class="k">${esc(L('wht', lang))} ${num(doc.whtRate)}%</span><span class="r">${M(-calc.wht)}</span>${U}<b class="k">${esc(L('net', lang))}</b><b class="r">${M(calc.net)}</b><b class="u">${unitW}</b></div>`;
         return h + '</div>';
       }
       const rows = [[L('subtotal', lang), calc.subtotal]];
@@ -157,9 +159,9 @@ function renderBlock(b, ctx) {
       if (doc.vatMode === 'inclusive') rows.push([L('beforeVat', lang), calc.beforeVat]);
       if (doc.vatMode !== 'none') rows.push([`${L('vat', lang)} ${calc.rate}%`, calc.vat]);
       const hl = resolveColor(p.highlight, tpl);
-      let h = `<div class="tt">` + rows.map(r => `<span class="k">${esc(r[0])}</span><span class="r">${money(r[1])}</span>`).join('');
-      h += `<span class="grand" style="background:${hl};color:${onColor(hl)};grid-column:1/-1;display:flex;justify-content:space-between;align-items:center;gap:3mm"><span class="bl" style="line-height:1.2">${L2('grand', lang)}</span><span style="white-space:nowrap;font-size:1.1em">${money(calc.total)}</span></span>`;
-      if (calc.wht) h += `<span class="k">${esc(L('wht', lang))} ${num(doc.whtRate)}%</span><span class="r">${money(-calc.wht)}</span><span style="font-weight:700">${esc(L('net', lang))}</span><span class="r" style="font-weight:700">${money(calc.net)}</span>`;
+      let h = `<div class="tt">` + rows.map(r => `<span class="k">${esc(r[0])}</span><span class="r">${mu(r[1])}</span>`).join('');
+      h += `<span class="grand" style="background:${hl};color:${onColor(hl)};grid-column:1/-1;display:flex;justify-content:space-between;align-items:center;gap:3mm"><span class="bl" style="line-height:1.2">${L2('grand', lang)}</span><span style="white-space:nowrap;font-size:1.1em">${mu(calc.total)}</span></span>`;
+      if (calc.wht) h += `<span class="k">${esc(L('wht', lang))} ${num(doc.whtRate)}%</span><span class="r">${mu(-calc.wht)}</span><span style="font-weight:700">${esc(L('net', lang))}</span><span class="r" style="font-weight:700">${mu(calc.net)}</span>`;
       return h + '</div>';
     }
     case 'words': {
@@ -234,7 +236,7 @@ function renderPage(doc, tpl, opts = {}) {
     if (b.type === 'items') cls.push('items-blk');
     if (opts.design && (b.id === opts.selected || (opts.multi || []).includes(b.id))) cls.push('sel');
     if (opts.design && b.p && b.p.hidden) cls.push('hid');
-    const fit = (b.p && b.p.fit ? ' data-fit="1"' : '') + (b.p && b.p.alignGrand ? ' data-align-grand="1"' : '') + (b.p && b.p.follow ? ` data-follow="${b.p.follow}"` : '') + (b.p && b.p.attach ? ` data-attach="${b.p.attach}"` : '');
+    const fit = ((b.p && b.p.fit) || b.type === 'title' ? ' data-fit="1"' : '') + (b.p && b.p.alignGrand ? ' data-align-grand="1"' : '') + (b.p && b.p.follow ? ` data-follow="${b.p.follow}"` : '') + (b.p && b.p.attach ? ` data-attach="${b.p.attach}"` : '');
     let inner = renderBlock(b, ctx);
     if (b.type === 'items') inner = `<div class="items-inner">${inner}</div>`;
     if (opts.design) inner += `<span class="tagname">${esc(t('b_' + b.type))}</span>`;
@@ -281,7 +283,19 @@ function pushBelowTotals(pageEl) {
   });
   if (need > 0) pageEl.querySelectorAll('.blk').forEach(b => { if (b !== tb && !b.classList.contains('blk-words') && !b.dataset.follow && b.offsetTop >= tb.offsetTop + 2) b.style.top = (b.offsetTop + need) + 'px'; });
 }
+/* header blocks (title / doc info / stay info) never run past the table's right edge — the title shrinks to fit instead of being cut off */
+function alignHeader(pageEl) {
+  const it = pageEl.querySelector('.items-blk'); if (!it) return;
+  const tbl = it.querySelector('table') || it.firstElementChild;
+  const R = it.offsetLeft + tbl.offsetWidth;
+  pageEl.querySelectorAll('.blk-title,.blk-docinfo,.blk-extra').forEach(b => {
+    if (b.offsetTop > it.offsetTop) return;
+    const l = b.offsetLeft, r = l + b.offsetWidth;
+    if (r > R + 1 && l < R - 20) b.style.width = (R - l) + 'px';
+  });
+}
 function applyFlow(pageEl, opts = {}) {
+  alignHeader(pageEl);
   if (opts.design) { attachToItems(pageEl); alignWords(pageEl); fitText(pageEl); return; }
   const it = pageEl.querySelector('.items-blk');
   let extra = 0;

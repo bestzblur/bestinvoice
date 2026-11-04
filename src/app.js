@@ -86,7 +86,7 @@ function renderShell() {
     <div class="co-card" data-act="go" data-v="settings"><div class="lg">${co.logo ? `<img src="${co.logo}" alt="">` : ico('building', 16)}</div><div style="min-width:0"><div class="nm">${esc(co.nameTh || co.nameEn || (LANG === 'th' ? 'ตั้งชื่อบริษัทของคุณ' : 'Set your company name'))}</div><div class="sb">${esc(co.branch || t('headOffice'))}</div></div></div>
     <div class="nav-label">${t('workspace')}</div>
     <nav class="nav">
-      ${[['dashboard', 'dashboard'], ['documents', 'file', S.documents.length], ['customers', 'users', S.customers.length], ['products', 'box', S.products.length], ['designer', 'layout'], ['verify', 'shield'], ['settings', 'gear']].map(([v, i, c]) => `<button data-act="go" data-v="${v}" class="${UI.view === v || (v === 'documents' && UI.view === 'editor') ? 'on' : ''}">${ico(i)}${t(v)}${c !== undefined ? `<span class="cnt">${c}</span>` : ''}</button>`).join('')}
+      ${[['dashboard', 'dashboard'], ['documents', 'file', S.documents.length], ['customers', 'users', S.customers.length], ['products', 'box', S.products.length], ['designer', 'layout'], ['settings', 'gear']].map(([v, i, c]) => `<button data-act="go" data-v="${v}" class="${UI.view === v || (v === 'documents' && UI.view === 'editor') ? 'on' : ''}">${ico(i)}${t(v)}${c !== undefined ? `<span class="cnt">${c}</span>` : ''}</button>`).join('')}
     </nav>
     <div class="side-foot">
       <div class="status-card"><b><span class="dot"></span>${t('ready')}</b><div style="margin-top:4px">${t('dataLocal')}</div><div>${t('dataSaved')}</div></div>
@@ -109,7 +109,7 @@ function renderShell() {
 function go(v) { UI.view = v; UI.page = 1; if (v !== 'editor') UI.ed = null; renderShell(); $('#content').scrollTop = 0; }
 function renderView() {
   const c = $('#content'); c.style.padding = '';
-  ({ dashboard: viewDashboard, documents: viewDocuments, editor: viewEditor, customers: viewCustomers, products: viewProducts, designer: viewDesigner, verify: viewVerify, settings: viewSettings })[UI.view](c);
+  (({ dashboard: viewDashboard, documents: viewDocuments, editor: viewEditor, customers: viewCustomers, products: viewProducts, designer: viewDesigner, settings: viewSettings })[UI.view] || viewDashboard)(c);
 }
 
 /* ---------- dashboard ---------- */
@@ -514,7 +514,7 @@ function viewSettings(c) {
       <label class="field" style="max-width:320px"><span>${t('uiFont')}</span><select class="inp" data-uifont>${sel(Object.keys(FONTS).map(k => [k, FONT_LABELS[k]]), S.settings.uiFont || 'plex')}</select></label>
       <div class="field"><span>${t('uiLang')}</span><div class="seg" style="align-self:flex-start"><button data-act="lang" data-v="th" class="${LANG === 'th' ? 'on' : ''}">ไทย</button><button data-act="lang" data-v="en" class="${LANG === 'en' ? 'on' : ''}">English</button></div></div>
       <div class="field"><span>${t('backup')}</span><small>${t('backupHint')}</small><div style="display:flex;gap:10px;flex-wrap:wrap;margin-top:6px"><button class="btn" data-act="export">${ico('download', 16)}${t('exportBackup')}</button><button class="btn" data-act="import">${ico('upload', 16)}${t('importBackup')}</button><button class="btn" data-act="sample">${ico('sparkle', 16)}${t('loadSample')}</button>${window.bestinvoiceNative ? `<button class="btn" data-act="openbackups">${ico('layers', 16)}${LANG === 'th' ? 'เปิดโฟลเดอร์สำรองอัตโนมัติ' : 'Open auto-backup folder'}</button>` : ''}<button class="btn danger" data-act="reset">${ico('trash', 16)}${t('resetAll')}</button></div></div>
-      <div class="hint">Bestinvoice 1.12 · macOS · Windows · ${LANG === 'th' ? 'ใช้งานได้แบบออฟไลน์' : 'Works offline'}</div>
+      <div class="hint">Bestinvoice 1.13 · macOS · Windows · ${LANG === 'th' ? 'ใช้งานได้แบบออฟไลน์' : 'Works offline'}</div>
     </div></div>
   </div>`;
   $$('[data-grow]', c).forEach(autoGrow);

@@ -12,7 +12,7 @@ const I18N = {
     revenue6m:'รายรับ 6 เดือนล่าสุด', recentDocs:'เอกสารล่าสุด', viewAll:'ดูทั้งหมด', quickStart:'เริ่มต้นใช้งาน',
     qs1:'ใส่ข้อมูลบริษัทและโลโก้', qs2:'ออกแบบหน้าตาใบเสร็จ', qs3:'สร้างใบเสร็จใบแรก',
     docsSub:'จัดการใบเสร็จ ใบกำกับภาษี ใบแจ้งหนี้ และใบเสนอราคาทั้งหมด',
-    all:'ทั้งหมด', receipt:'ใบเสร็จรับเงิน', taxreceipt:'ใบเสร็จ/ใบกำกับภาษี', invoice:'ใบแจ้งหนี้', quotation:'ใบเสนอราคา',
+    all:'ทั้งหมด', receipt:'ใบเสร็จรับเงิน', taxreceipt:'ใบกำกับภาษี', invoice:'ใบแจ้งหนี้', quotation:'ใบเสนอราคา',
     paid:'ชำระแล้ว', unpaid:'รอชำระ', draft:'ฉบับร่าง', cancelled:'ยกเลิก', overdue:'เกินกำหนด',
     docNo:'เลขที่', date:'วันที่', customer:'ลูกค้า', type:'ประเภท', amount:'ยอดเงิน', status:'สถานะ',
     allStatus:'ทุกสถานะ', thisMonth:'เดือนนี้', lastMonth:'เดือนที่แล้ว', thisYear:'ปีนี้', allTime:'ทุกช่วงเวลา',
@@ -119,7 +119,7 @@ const I18N = {
     revenue6m:'Revenue, last 6 months', recentDocs:'Recent documents', viewAll:'View all', quickStart:'Get started',
     qs1:'Add company details & logo', qs2:'Design your receipt', qs3:'Create your first receipt',
     docsSub:'Manage all receipts, tax invoices, invoices and quotations.',
-    all:'All', receipt:'Receipt', taxreceipt:'Receipt / Tax invoice', invoice:'Invoice', quotation:'Quotation',
+    all:'All', receipt:'Receipt', taxreceipt:'Tax invoice', invoice:'Invoice', quotation:'Quotation',
     paid:'Paid', unpaid:'Unpaid', draft:'Draft', cancelled:'Cancelled', overdue:'Overdue',
     docNo:'No.', date:'Date', customer:'Customer', type:'Type', amount:'Amount', status:'Status',
     allStatus:'All statuses', thisMonth:'This month', lastMonth:'Last month', thisYear:'This year', allTime:'All time',
@@ -216,7 +216,7 @@ const I18N = {
 
 /* Labels printed ON the document (independent of UI language) */
 const DOC_LABELS = {
-  receipt:['ใบเสร็จรับเงิน','RECEIPT'], taxreceipt:['ใบเสร็จรับเงิน / ใบกำกับภาษี','RECEIPT / TAX INVOICE'],
+  receipt:['ใบเสร็จรับเงิน','RECEIPT'], taxreceipt:['ใบกำกับภาษี','TAX INVOICE'],
   invoice:['ใบแจ้งหนี้','INVOICE'], quotation:['ใบเสนอราคา','QUOTATION'],
   no:['เลขที่','No.'], date:['วันที่','Date'], due:['ครบกำหนด','Due date'], ref:['อ้างอิง','Reference'], validUntil:['ยืนราคาถึง','Valid until'],
   customer:['ลูกค้า','Customer'], billTo:['ได้รับเงินจาก','Received from'], taxId:['เลขประจำตัวผู้เสียภาษี','Tax ID'], branch:['สาขา','Branch'],
