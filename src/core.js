@@ -14,10 +14,13 @@ const initials = s => { const w = String(s || '?').replace(/^(บริษัท
 
 const TH_MONTHS = ['ม.ค.','ก.พ.','มี.ค.','เม.ย.','พ.ค.','มิ.ย.','ก.ค.','ส.ค.','ก.ย.','ต.ค.','พ.ย.','ธ.ค.'];
 const EN_MONTHS = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+const TH_FULL = ['มกราคม','กุมภาพันธ์','มีนาคม','เมษายน','พฤษภาคม','มิถุนายน','กรกฎาคม','สิงหาคม','กันยายน','ตุลาคม','พฤศจิกายน','ธันวาคม'];
+const EN_FULL = ['January','February','March','April','May','June','July','August','September','October','November','December'];
 function fmtDate(iso, lang, style = 'short') {
   if (!iso) return '';
   const [y, m, d] = iso.split('-').map(Number);
   const be = S.settings.buddhistYear;
+  if (style === 'long') { const dd = String(d).padStart(2, '0'); return lang === 'en' ? `${dd} ${EN_FULL[m - 1]} ${be ? y + 543 : y}` : `${dd} ${TH_FULL[m - 1]} ${be ? y + 543 : y}`; }
   if (style === 'num') return `${String(d).padStart(2,'0')}/${String(m).padStart(2,'0')}/${lang === 'en' && !be ? y : (be ? y + 543 : y)}`;
   if (lang === 'en') return `${d} ${EN_MONTHS[m - 1]} ${be ? y + 543 : y}`;
   return `${d} ${TH_MONTHS[m - 1]} ${be ? y + 543 : y}`;
@@ -48,6 +51,8 @@ function englishText(amount) {
 
 /* ---------- money maths ---------- */
 const isNightly = unit => /คืน|night/i.test(String(unit || ''));
+/* room / per-night lines: explicit switch if the user set one, otherwise guessed from unit + description */
+const isPerNight = it => it.perNight !== undefined ? !!it.perNight : (/คืน|ห้อง|night|room/i.test(String(it.unit || '')) || /ห้องพัก|ค่าห้อง|ค่าที่พัก|เตียง|room|suite/i.test(String(it.desc || '')));
 const nightsOf = it => (it.nights !== undefined && it.nights !== '' && num(it.nights) > 0) ? num(it.nights) : 1;
 function lineAmount(it) { return r2(num(it.qty) * num(it.price) * nightsOf(it) - num(it.discount)); }
 function discountsOf(doc) { return Array.isArray(doc.discounts) ? doc.discounts : (num(doc.discount) ? [{ type: 'amount', value: num(doc.discount), label: '' }] : []); }
@@ -248,7 +253,9 @@ const PRESET_DEFS = {
   a5:         { th: 'ครึ่ง A4 (A5)', en: 'Half A4 (A5)', style: 'minimal', paper: 'A5', accent: '#13A387', font: 'plex' },
   slip:       { th: 'สลิป 80 มม.', en: '80 mm slip', style: 'minimal', paper: '80mm', accent: '#111111', font: 'plex', thanks: 'ขอบคุณที่ใช้บริการ\nThank you!', items: { headerBg: 'transparent', headerText: '#111111' }, noSig: true },
   // business templates
-  hotel:      { biz: 1, icon: '🏨', th: 'โรงแรม / รีสอร์ท', en: 'Hotel / Resort', style: 'band', paper: 'A4', accent: '#A47E3B', font: 'plex', sig: ['customerSign', 'receiver'],
+  hotel:      { biz: 1, icon: '🏨', th: 'โรงแรม / ที่พัก (A5 แนวนอน)', en: 'Hotel / Guesthouse (A5 landscape)', paper: 'A5L', accent: '#A8C7F5', font: 'noto', build: hotelReceiptBook, docLang: 'th', dateStyle: 'long', intMoney: true,
+                extra: [Object.assign(F('room', 'ห้อง', 'Room'), {}), F('checkin', 'เข้าพักวันที่', 'Check-in', 'checkin'), F('checkout', 'ออกวันที่', 'Check-out', 'checkout'), Object.assign(F('nights', 'จำนวนคืน', 'Nights', 'nights'), { hidePrint: true }), Object.assign(F('rooms', 'จำนวนห้อง', 'Rooms', 'rooms'), { hidePrint: true })] },
+  hotelModern: { biz: 1, icon: '🏨', th: 'โรงแรม / รีสอร์ท (A4 โมเดิร์น)', en: 'Hotel / Resort (A4 modern)', style: 'band', paper: 'A4', accent: '#A47E3B', font: 'plex', sig: ['customerSign', 'receiver'],
                 extra: [F('checkin', 'วันเช็คอิน', 'Check-in', 'checkin'), F('checkout', 'วันเช็คเอาท์', 'Check-out', 'checkout'), F('nights', 'จำนวนคืน', 'Nights', 'nights'), F('rooms', 'จำนวนห้อง', 'Rooms', 'rooms'), F('room', 'เลขห้อง', 'Room no.')],
                 notes: 'เช็คอิน 14:00 น. / เช็คเอาท์ 12:00 น.', items: { headerBg: '#F6EFE2', headerText: '#5E4520', striped: true } },
   restaurant: { biz: 1, icon: '🍜', th: 'ร้านอาหาร / คาเฟ่', en: 'Restaurant / Café', style: 'minimal', paper: '80mm', accent: '#D9622B', font: 'plex', thanks: 'ขอบคุณที่มาอุดหนุน\nThank you, see you again!',
@@ -264,9 +271,29 @@ const PRESET_DEFS = {
   rental:     { biz: 1, icon: '🏢', th: 'ให้เช่า / อพาร์ตเมนต์', en: 'Rental / Apartment', style: 'minimal', paper: 'slipL', accent: '#0F766E', font: 'plex', sig: ['payer', 'receiver'],
                 extra: [F('room', 'ห้อง / ยูนิต', 'Room / unit'), F('month', 'ประจำเดือน', 'For month'), F('meter', 'มิเตอร์น้ำ/ไฟ', 'Water / power meter')] }
 };
+/* Thai receipt-book layout for hotels / guesthouses, A5 landscape (210 × 148 mm) */
+function hotelReceiptBook() {
+  return [
+    B('company', 22, 14, 70, 30, { size: 8, nameSize: 11.5, showEn: false, showAddress: true, showTaxId: true, showContact: true, fit: true, font: 'kanit' }),
+    B('logo', 92, 11, 30, 30),
+    B('title', 128, 14, 60, 13, { size: 17, bold: true, align: 'right', title: '', thOnly: true, copyTag: false, fit: true }),
+    B('docinfo', 142, 45, 46, 13, { size: 9, boldLabels: true, showDue: false, showRef: false }),
+    B('customer', 22, 58, 112, 26, { size: 9, book: true, fit: true }),
+    B('extra', 142, 62, 50, 22, { size: 9, darkLabels: true, fit: true }),
+    B('items', 22, 87, 168, 15, { size: 9, headerBg: 'accent', headerText: '#1D2128', showNo: true, showUnit: false, stayQty: true, bahtCol: true, book: true, nightWord: 'วัน' }),
+    B('totals', 62, 104, 128, 10, { size: 9.5, variant: 'box' }),
+    B('qr', 22, 118, 15, 19, { caption: true }),
+    B('notes', 40, 120, 92, 14, { size: 8 }),
+    B('signature', 140, 121, 50, 16, { size: 9.5, variant: 'line', count: 1, labels: ['receiver', 'ผู้จัดการ'], useSig: true })
+  ];
+}
 const presetName = k => (PRESET_DEFS[k] ? (LANG === 'en' ? PRESET_DEFS[k].en : PRESET_DEFS[k].th) : k);
 function makeTemplate(key) {
   const d = PRESET_DEFS[key] || PRESET_DEFS.minimal;
+  if (d.build) {
+    const tpl = { id: uid(), preset: key, name: LANG === 'en' ? d.en : d.th, style: 'book', paper: d.paper, accent: d.accent, font: d.font, base: 9, extraFields: clone(d.extra || []), presetNotes: d.notes || '', blocks: d.build(), docLang: d.docLang || '', dateStyle: d.dateStyle || '', intMoney: !!d.intMoney };
+    return tpl;
+  }
   const blocks = [];
   if (d.style === 'band') blocks.push(B('shape', 0, 0, 1, 1, { kind: 'rect', accentFill: true, thickness: 0, stroke: 'transparent', role: 'band' }));
   blocks.push(B('logo', 0, 0, 1, 1), B('company', 0, 0, 1, 1, { showEn: true, showAddress: true, showTaxId: true, showContact: true, fit: true }));
@@ -292,7 +319,7 @@ const PRESETS = Object.fromEntries(Object.keys(PRESET_DEFS).map(k => [k, () => m
 function syncStay(doc, tpl, changed) {
   const fs = (tpl && tpl.extraFields) || []; const ex = doc.extra = doc.extra || {};
   const ci = fs.find(f => f.type === 'checkin'), co = fs.find(f => f.type === 'checkout'), ng = fs.find(f => f.type === 'nights');
-  if (!ci) return;
+  if (!ci) { for (const it of doc.items || []) delete it.nights; return; }
   if (!ex[ci.k]) ex[ci.k] = doc.date || todayISO();
   const nights = ng ? Math.max(1, parseInt(ex[ng.k]) || 1) : 1;
   if (co && (changed === 'checkout') && ex[co.k] && ex[ci.k]) {
@@ -305,7 +332,10 @@ function syncStay(doc, tpl, changed) {
   if (ng) {
     ex[ng.k] = Math.max(1, parseInt(ex[ng.k]) || 1);
     // room lines: amount = price × rooms (qty) × nights
-    for (const it of doc.items) if (isNightly(it.unit)) { it.nights = ex[ng.k]; if (rm && (changed === 'rooms' || it.qty === undefined || it.qty === '')) it.qty = ex[rm.k]; }
+    for (const it of doc.items) {
+      if (isPerNight(it) && (it.desc || num(it.price))) { it.nights = ex[ng.k]; if (rm && (changed === 'rooms' || it.qty === undefined || it.qty === '')) it.qty = ex[rm.k]; }
+      else delete it.nights;
+    }
   }
 }
 function ensureExtra(doc) { const tpl = templateFor(doc); doc.extra = doc.extra || {}; syncStay(doc, tpl); }

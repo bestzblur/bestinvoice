@@ -82,15 +82,20 @@ function renderBlock(b, ctx) {
       return h;
     }
     case 'docinfo': {
-      const rows = [[L('no', lang), doc.number], [L('date', lang), fmtDate(doc.date, lang === 'en' ? 'en' : 'th')]];
-      if (p.showDue !== false && doc.dueDate && (doc.type === 'invoice' || doc.type === 'quotation')) rows.push([L(doc.type === 'quotation' ? 'validUntil' : 'due', lang), fmtDate(doc.dueDate, lang === 'en' ? 'en' : 'th')]);
+      const rows = [[L('no', lang), doc.number], [L('date', lang), ctx.D(doc.date)]];
+      if (p.showDue !== false && doc.dueDate && (doc.type === 'invoice' || doc.type === 'quotation')) rows.push([L(doc.type === 'quotation' ? 'validUntil' : 'due', lang), ctx.D(doc.dueDate)]);
       if (p.showRef !== false && doc.reference) rows.push([L('ref', lang), doc.reference]);
       if (p.inline) return rows.map(r => `<span class="k">${esc(r[0])}</span> ${esc(r[1])}`).join(' &nbsp;·&nbsp; ');
       const jc = p.align === 'right' ? 'justify-content:end' : p.align === 'center' ? 'justify-content:center' : '';
+      if (p.boldLabels) return `<div class="kv" style="${jc};gap:.8mm 6mm">${rows.map(r => `<b>${esc(r[0])}</b><span style="text-align:left">${esc(r[1])}</span>`).join('')}</div>`;
       return `<div class="kv" style="${jc}">${rows.map(r => `<span class="k">${esc(r[0])}</span><span style="font-weight:600;text-align:left">${esc(r[1])}</span>`).join('')}</div>`;
     }
     case 'customer': {
       const c = doc.customer || {};
+      if (p.book) {
+        const br = c.branch ? (/^\d+$/.test(c.branch.trim()) ? ` ${L('branch', lang) === 'สาขา' ? 'สาขาที่' : 'Branch'} ${c.branch.trim()}` : ` (${c.branch})`) : '';
+        return `<div style="display:flex;flex-direction:column;height:100%"><div style="font-weight:700;font-size:1.05em;line-height:1.35">${esc((c.name || (ctx.design ? '—' : '')) + br)}</div>${c.address ? `<div>${nl2br(c.address)}</div>` : ''}${c.phone ? `<div>${esc(L('tel', lang))} ${esc(c.phone)}</div>` : ''}${c.taxId ? `<div style="margin-top:auto"><b>${esc(L('taxId', lang))}</b>&nbsp;&nbsp; ${esc(c.taxId)}</div>` : ''}</div>`;
+      }
       const head = p.label || L(doc.type === 'receipt' || doc.type === 'taxreceipt' ? 'billTo' : 'customer', lang);
       let h = `<div class="k" style="font-size:.88em;margin-bottom:.6mm">${esc(head)}</div>`;
       h += `<div style="font-weight:700;font-size:1.08em;line-height:1.3">${esc(c.name || (ctx.design ? '—' : ''))}</div>`;
@@ -110,7 +115,7 @@ function renderBlock(b, ctx) {
         return h + `</tbody></table><div style="border-top:.25mm dashed #111;margin-top:1mm"></div>`;
       }
       const cols = [];
-      const hasNights = items.some(it => it.nights !== undefined && it.nights !== '' && num(it.nights) > 0);
+      const hasNights = !p.stayQty && items.some(it => it.nights !== undefined && it.nights !== '' && num(it.nights) > 0);
       if (p.showNo !== false) cols.push(['idx', 'c', '14mm']);
       cols.push(['desc', '', '']);
       cols.push(['qty', 'c', '15mm']);
@@ -119,15 +124,32 @@ function renderBlock(b, ctx) {
       cols.push(['price', 'r', '22mm']);
       if (hasDisc) cols.push(['disc', 'r', '17mm']);
       cols.push(['amount', 'r', '24mm']);
-      let h = `<table class="it"><thead><tr style="background:${hb};color:${ht}">` + cols.map(c => `<th class="${c[1]}" style="${c[2] ? 'width:' + c[2] + ';' : ''}${bd}">${L2(c[0], lang)}</th>`).join('') + `</tr></thead><tbody>`;
+      if (p.bahtCol) cols.push(['baht', 'c', '10mm']);
+      const M = ctx.M, nw = p.nightWord || (lang === 'en' ? 'nights' : 'คืน');
+      const thLab = k => k === 'baht' ? '' : (p.stayQty && k === 'price' ? (lang === 'en' ? 'Unit price' : lang === 'th' ? 'หน่วยละ' : 'หน่วยละ<small>Unit price</small>') : p.stayQty && k === 'amount' ? (lang === 'en' ? 'Amount' : lang === 'th' ? 'รวมเป็นเงิน' : 'รวมเป็นเงิน<small>Amount</small>') : L2(k, lang));
+      let h = `<table class="it${p.book ? ' book' : ''}" style="${p.book ? `border-bottom:.6mm solid ${hb}` : ''}"><thead><tr style="background:${hb};color:${ht}">` + cols.map(c => `<th class="${p.book && c[0] !== 'amount' ? 'c' : c[1]}" style="${c[2] ? 'width:' + c[2] + ';' : ''}${bd}">${thLab(c[0])}</th>`).join('') + `</tr></thead><tbody>`;
       const rows = items.map((it, i) => {
-        const cell = { idx: (ctx.rowOffset || 0) + i + 1, desc: nl2br(it.desc), qty: money(it.qty, num(it.qty) % 1 ? 2 : 0), unit: esc(it.unit), nights: (it.nights !== undefined && it.nights !== '') ? money(it.nights, 0) : '', price: money(it.price), disc: num(it.discount) ? money(it.discount) : '', amount: money(lineAmount(it)) };
-        return `<tr style="${p.striped && i % 2 ? 'background:#F6F7F9' : ''}">` + cols.map(c => `<td class="${c[1]}" style="${bd}">${cell[c[0]]}</td>`).join('') + '</tr>';
+        const q = money(it.qty, num(it.qty) % 1 ? 2 : 0);
+        const qtyCell = p.stayQty ? `${q}${it.unit ? ' ' + esc(it.unit) : ''}${it.nights !== undefined && it.nights !== '' ? `<div style="margin-top:1.2mm">${money(it.nights, 0)} ${esc(nw)}</div>` : ''}` : q;
+        const cell = { idx: (ctx.rowOffset || 0) + i + 1, desc: nl2br(it.desc), qty: qtyCell, baht: lang === 'en' ? 'THB' : 'บาท', unit: esc(it.unit), nights: (it.nights !== undefined && it.nights !== '') ? money(it.nights, 0) : '', price: M(it.price), disc: num(it.discount) ? M(it.discount) : '', amount: M(lineAmount(it)) };
+        return `<tr style="${p.striped && i % 2 ? 'background:#F6F7F9' : ''}">` + cols.map(c => `<td class="${p.book && c[0] !== 'amount' ? 'c' : c[1]}" style="${bd}${p.book ? 'border-bottom:0;' : ''}">${cell[c[0]]}</td>`).join('') + '</tr>';
       });
       for (let i = items.length; i < (ctx.rowOffset ? 0 : (ctx.fillTo !== undefined ? Math.min(ctx.fillTo, p.minRows || 0) : (p.minRows || 0))); i++) rows.push('<tr>' + cols.map(() => `<td style="${bd}">&nbsp;</td>`).join('') + '</tr>');
       return h + rows.join('') + '</tbody></table>';
     }
     case 'totals': {
+      if (p.variant === 'box') {
+        const M = ctx.M, pre = [];
+        for (const dc of calc.discounts || []) pre.push([(dc.label || L('discount', lang)) + (dc.type === 'percent' ? ` ${dc.value}%` : ''), -dc.amount]);
+        if (doc.vatMode !== 'none') { if (pre.length || doc.vatMode === 'exclusive') pre.unshift([L('subtotal', lang), calc.subtotal]); if (doc.vatMode === 'inclusive') pre.push([L('beforeVat', lang), calc.beforeVat]); pre.push([`${L('vat', lang)} ${calc.rate}%`, calc.vat]); }
+        else if (pre.length) pre.unshift([L('subtotal', lang), calc.subtotal]);
+        const words = lang === 'en' ? englishText(calc.total) : bahtText(calc.total);
+        let h = `<div style="display:flex;flex-direction:column;justify-content:flex-end;height:100%">`;
+        if (pre.length) h += `<div class="tt" style="margin-left:auto;width:62%;margin-bottom:1.2mm">${pre.map(r => `<span class="k">${esc(r[0])}</span><span class="r">${M(r[1])}</span>`).join('')}</div>`;
+        h += `<div class="sumbox"><b>${lang === 'en' ? 'Amount' : 'จำนวนเงิน'}</b><b class="sw">${esc(words)}</b><b>${lang === 'en' ? 'Total' : 'รวมเงิน'}</b><b class="sv">${M(calc.total)}</b><b>${lang === 'en' ? 'THB' : 'บาท'}</b></div>`;
+        if (calc.wht) h += `<div class="tt" style="margin-left:auto;width:62%;margin-top:1.2mm"><span class="k">${esc(L('wht', lang))} ${num(doc.whtRate)}%</span><span class="r">${M(-calc.wht)}</span><b>${esc(L('net', lang))}</b><b class="r">${M(calc.net)}</b></div>`;
+        return h + '</div>';
+      }
       const rows = [[L('subtotal', lang), calc.subtotal]];
       for (const dc of calc.discounts || []) rows.push([(dc.label || L('discount', lang)) + (dc.type === 'percent' ? ` ${money(dc.value, dc.value % 1 ? 2 : 0)}%` : ''), -dc.amount]);
       if (calc.discount) rows.push([L('afterDiscount', lang), calc.afterDiscount]);
@@ -149,16 +171,17 @@ function renderBlock(b, ctx) {
       const fs = tpl.extraFields || []; const ex = doc.extra || {};
       if (!fs.length) return ctx.design ? `<span style="color:#9aa1ab">${LANG === 'th' ? 'ยังไม่มีช่องข้อมูลเพิ่มเติม — ตั้งค่าได้ที่แผงด้านขวา' : 'No extra fields yet — add them in the right panel'}</span>` : '';
       const lab = f => lang === 'en' ? f.en : lang === 'th' ? f.th : `${f.th} / ${f.en}`;
-      const val = f => { const v = ex[f.k]; if (v === undefined || v === '') return ctx.design ? '—' : ''; if (f.type === 'date' || f.type === 'checkin' || f.type === 'checkout') return fmtDate(v, lang === 'en' ? 'en' : 'th'); if (f.type === 'nights') return `${v} ${lang === 'en' ? (+v === 1 ? 'night' : 'nights') : 'คืน'}`; return v; };
-      const rows = fs.filter(f => ctx.design || (ex[f.k] !== undefined && ex[f.k] !== ''));
+      const val = f => { const v = ex[f.k]; if (v === undefined || v === '') return ctx.design ? '—' : ''; if (f.type === 'date' || f.type === 'checkin' || f.type === 'checkout') return ctx.D(v); if (f.type === 'nights') return `${v} ${lang === 'en' ? (+v === 1 ? 'night' : 'nights') : 'คืน'}`; return v; };
+      const rows = fs.filter(f => !f.hidePrint && (ctx.design || (ex[f.k] !== undefined && ex[f.k] !== '')));
       if (p.inline) return rows.map(f => `<span class="k">${esc(lab(f))}</span> <b>${esc(val(f))}</b>`).join(' &nbsp;·&nbsp; ');
+      if (p.darkLabels) return `<div class="kv" style="gap:1.2mm 3mm">${rows.map(f => `<span>${esc(lab(f))}</span><span>${esc(val(f))}</span>`).join('')}</div>`;
       return `<div class="kv">${rows.map(f => `<span class="k">${esc(lab(f))}</span><span style="font-weight:600">${esc(val(f))}</span>`).join('')}</div>`;
     }
     case 'qr': {
       if (!qrOn(doc) && !ctx.design) return '';
       const txt = ctx.design && !doc.number ? 'BIV1|SAMPLE' : qrPayload(doc, calc);
       const cap = p.caption !== false;
-      return `<div style="display:flex;flex-direction:column;align-items:center;height:100%;gap:.6mm"><div style="flex:1;min-height:0;width:100%">${qrSvg(txt)}</div>${cap ? `<div style="font-size:6.5pt;line-height:1.15;text-align:center;color:#555;white-space:nowrap">${esc(lang === 'en' ? 'Scan to verify' : lang === 'th' ? 'สแกนเพื่อตรวจสอบ' : 'สแกนตรวจสอบ / Verify')}</div>` : ''}</div>`;
+      return `<div style="display:flex;flex-direction:column;align-items:center;height:100%;gap:.6mm"><div style="flex:1;min-height:0;width:100%">${qrSvg(txt)}</div>${cap ? `<div style="font-size:6pt;line-height:1.1;text-align:center;color:#555;width:100%;overflow-wrap:anywhere">${esc(lang === 'en' ? 'Scan to verify' : lang === 'th' ? 'สแกนเพื่อตรวจสอบ' : 'สแกนตรวจสอบ / Verify')}</div>` : ''}</div>`;
     }
     case 'notes':
       if (!doc.notes && !ctx.design) return '';
@@ -169,6 +192,11 @@ function renderBlock(b, ctx) {
     }
     case 'signature': {
       const n = Math.max(1, Math.min(4, p.count || 2)); const labels = p.labels || [];
+      if (p.variant === 'line') {
+        const tx = k => DOC_LABELS[k] ? L(k, lang) : (k || '');
+        const img = p.useSig && co.signature ? `<img src="${co.signature}" alt="" style="position:absolute;left:50%;bottom:55%;transform:translateX(-30%);max-height:11mm;max-width:60%">` : '';
+        return `<div style="position:relative;height:100%;display:flex;flex-direction:column;justify-content:flex-end;align-items:center">${img}<div style="white-space:nowrap">${esc(tx(labels[0] || 'receiver'))} ${'.'.repeat(28)}</div>${labels[1] ? `<div style="margin-top:.8mm;padding-left:20%">${esc(tx(labels[1]))}</div>` : ''}</div>`;
+      }
       let h = '<div class="sig">';
       for (let i = 0; i < n; i++) {
         const lab = labels[i] || 'receiver';
@@ -193,8 +221,9 @@ function renderBlock(b, ctx) {
 }
 
 function renderPage(doc, tpl, opts = {}) {
-  const lang = doc.docLang || S.settings.docLang || 'both';
-  const ctx = { doc, co: S.settings.company, calc: opts.calc || calcDoc(doc), lang, tpl, design: !!opts.design, copy: opts.copy, rowOffset: opts.rowOffset || 0, fillTo: opts.fillTo };
+  const lang = tpl.docLang || doc.docLang || S.settings.docLang || 'both';
+  const ctx = { doc, co: S.settings.company, calc: opts.calc || calcDoc(doc), lang, tpl, design: !!opts.design, copy: opts.copy, rowOffset: opts.rowOffset || 0, fillTo: opts.fillTo,
+    D: iso => fmtDate(iso, lang === 'en' ? 'en' : 'th', tpl.dateStyle === 'long' ? 'long' : 'short'), M: v => (tpl.intMoney && Math.abs(r2(v) % 1) < .001) ? money(v, 0) : money(v) };
   const [pw, ph] = PAPERS[tpl.paper] || PAPERS.A4;
   let h = `<div class="page${opts.grid ? ' grid-on' : ''}" data-paper="${tpl.paper}" style="width:${pw}mm;height:${ph}mm;--doc-font:${FONTS[tpl.font] || FONTS.plex};font-size:${tpl.base}pt">`;
   for (const b of tpl.blocks) {
@@ -266,7 +295,7 @@ function buildPages(container, doc, tpl, opts = {}) {
   const itemsBottom = itB.y + itB.h;
   const below = tpl.blocks.filter(b => b !== itB && !(b.p && b.p.hidden) && b.y >= itemsBottom - .5);
   const belowSpan = below.length ? Math.max(...below.map(b => b.y + b.h)) - itemsBottom : 0;
-  const maxLast = Math.max(itB.h, ph - itB.y - belowSpan - 6) * pxmm;
+  const maxLast = Math.max(itB.h, ph - itB.y - belowSpan - 3) * pxmm;
   const need = el.firstElementChild.offsetHeight;
   if (need <= maxLast) {
     if (itB.p.minRows) { // add empty ruled rows only as far as the space allows
@@ -290,6 +319,7 @@ function buildPages(container, doc, tpl, opts = {}) {
   }
   const items = (doc.items || []).filter(it => it.desc || num(it.price));
   const calc = calcDoc(doc), n = chunks.length;
+  if (n === 1) { container.innerHTML = renderPage(doc, tpl, opts); applyFlow(container.firstElementChild); return 1; }
   container.innerHTML = chunks.map(([a, b], k) => renderPage({ ...doc, items: items.slice(a, b) }, tpl, { ...opts, calc, rowOffset: a, pageNo: [k + 1, n], hideBelow: k < n - 1 ? itemsBottom : undefined })).join('');
   container.querySelectorAll('.page').forEach(p => applyFlow(p));
   return n;

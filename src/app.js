@@ -282,14 +282,15 @@ function viewEditor(c) {
             <div class="grid g3"><label class="field"><span>${t('taxId')}</span><input class="inp" data-f="customer.taxId" value="${esc(d.customer.taxId)}" inputmode="numeric"></label><label class="field"><span>${t('branch')}</span><input class="inp" data-f="customer.branch" value="${esc(d.customer.branch)}" placeholder="${t('headOffice')}"></label><label class="field"><span>${t('phone')}</span><input class="inp" data-f="customer.phone" value="${esc(d.customer.phone)}"></label></div>
           </div></div>
         <div class="card card-b sec"><h4><span class="n">3</span>${t('s3')}</h4>
-          <div class="irows" id="items-body">${d.items.map((it, i) => { const nightly = hasStay && isNightly(it.unit); return `<div class="irow" data-row="${i}">
+          <div class="irows" id="items-body">${d.items.map((it, i) => { const nightly = hasStay && isPerNight(it); return `<div class="irow" data-row="${i}">
             <span class="h" title="${t('dragToSort')}">${ico('grip', 16)}</span>
             <textarea class="inp desc" rows="1" list="dl-products" data-it="${i}" data-k="desc" data-grow placeholder="${t('desc')}">${esc(it.desc)}</textarea>
             <button class="menu-btn del" data-act="eddelitem" data-i="${i}" title="${t('removeItem')}">${ico('x', 16)}</button>
             <label class="mini"><small>${nightly ? t('qtyRooms') : t('qty')}</small><input class="inp sm num" data-it="${i}" data-k="qty" value="${it.qty}" inputmode="decimal"></label>
             <label class="mini"><small>${t('unit')}</small><input class="inp sm" data-it="${i}" data-k="unit" value="${esc(it.unit)}"></label>
             <label class="mini"><small>${t('price')}</small><input class="inp sm num" data-it="${i}" data-k="price" value="${it.price}" inputmode="decimal"></label>
-            <div class="amt"><small>${t('lineTotal')}</small><b data-amt="${i}">${money(lineAmount(it))}</b>${nightly ? `<em data-nh="${i}">× ${nightsOf(it)} ${t('nightsCol')}</em>` : ''}</div>
+            <div class="amt"><small>${t('lineTotal')}</small><b data-amt="${i}">${money(lineAmount(it))}</b></div>
+            ${hasStay ? `<label class="pn${nightly ? ' on' : ''}"><input type="checkbox" data-it="${i}" data-k="perNight" ${nightly ? 'checked' : ''}><i></i>${t('perNight')}${nightly ? ` <em data-nh="${i}">${esc(perNightText(it))}</em>` : ''}</label>` : ''}
           </div>`; }).join('')}</div>
           <datalist id="dl-products">${S.products.map(p => `<option value="${esc(p.name)}">${money(p.price)} / ${esc(p.unit)}</option>`).join('')}</datalist>
           <button class="btn sm" data-act="edadditem" style="margin-top:6px">${ico('plus', 15)}${t('addItem')}</button>
@@ -323,6 +324,7 @@ function viewEditor(c) {
   wireItemDrag();
 }
 function autoGrow(el) { el.style.height = 'auto'; el.style.height = el.scrollHeight + 2 + 'px'; }
+function perNightText(it) { return `${money(it.price, it.price % 1 ? 2 : 0)} × ${money(it.qty, 0)} ${t('qtyRooms')} × ${nightsOf(it)} ${t('nightsCol')} = ${money(lineAmount(it))}`; }
 function discountRows(d) {
   const list = discountsOf(d);
   if (!list.length) return `<div class="disc-none">${t('noDiscount')}</div>`;
@@ -343,7 +345,7 @@ function updateEditorTotals() {
   for (const dc of k.discounts) rows.push([(dc.label || t('disc')) + (dc.type === 'percent' ? ` ${dc.value}%` : ''), -dc.amount]);
   if (k.discount) rows.push([t('afterDiscount'), k.afterDiscount]);
   discountsOf(d).forEach((dc, i) => { const el = $(`[data-dcamt="${i}"]`); if (el) el.textContent = '−' + money(discAmount(d, i)); });
-  d.items.forEach((it, i) => { const nh = $(`[data-nh="${i}"]`); if (nh) nh.textContent = `× ${nightsOf(it)} ${t('nightsCol')}`; });
+  d.items.forEach((it, i) => { const nh = $(`[data-nh="${i}"]`); if (nh) nh.textContent = perNightText(it); });
   if (d.vatMode === 'inclusive') rows.push([t('beforeVat'), k.beforeVat]);
   if (d.vatMode !== 'none') rows.push([`${t('vat')} ${k.rate}%`, k.vat]);
   let h = rows.map(r => `<span>${esc(r[0])}</span><span class="r">${money(r[1])}</span>`).join('');
@@ -460,7 +462,7 @@ function viewSettings(c) {
       <label class="field" style="max-width:320px"><span>${t('uiFont')}</span><select class="inp" data-uifont>${sel(Object.keys(FONTS).map(k => [k, FONT_LABELS[k]]), S.settings.uiFont || 'plex')}</select></label>
       <div class="field"><span>${t('uiLang')}</span><div class="seg" style="align-self:flex-start"><button data-act="lang" data-v="th" class="${LANG === 'th' ? 'on' : ''}">ไทย</button><button data-act="lang" data-v="en" class="${LANG === 'en' ? 'on' : ''}">English</button></div></div>
       <div class="field"><span>${t('backup')}</span><small>${t('backupHint')}</small><div style="display:flex;gap:10px;flex-wrap:wrap;margin-top:6px"><button class="btn" data-act="export">${ico('download', 16)}${t('exportBackup')}</button><button class="btn" data-act="import">${ico('upload', 16)}${t('importBackup')}</button><button class="btn" data-act="sample">${ico('sparkle', 16)}${t('loadSample')}</button>${window.bestinvoiceNative ? `<button class="btn" data-act="openbackups">${ico('layers', 16)}${LANG === 'th' ? 'เปิดโฟลเดอร์สำรองอัตโนมัติ' : 'Open auto-backup folder'}</button>` : ''}<button class="btn danger" data-act="reset">${ico('trash', 16)}${t('resetAll')}</button></div></div>
-      <div class="hint">Bestinvoice 1.4 · macOS · Windows · ${LANG === 'th' ? 'ใช้งานได้แบบออฟไลน์' : 'Works offline'}</div>
+      <div class="hint">Bestinvoice 1.5 · macOS · Windows · ${LANG === 'th' ? 'ใช้งานได้แบบออฟไลน์' : 'Works offline'}</div>
     </div></div>
   </div>`;
   $$('[data-grow]', c).forEach(autoGrow);
@@ -519,6 +521,7 @@ document.addEventListener('click', e => {
 document.addEventListener('change', e => {
   const el = e.target;
   if (el.dataset.uichange) { UI[el.dataset.uichange] = el.value; UI.page = 1; renderView(); return; }
+  if (el.dataset.k === 'perNight' && UI.ed) { const d = UI.ed.doc, it = d.items[+el.dataset.it]; it.perNight = el.checked; if (!el.checked) delete it.nights; syncStay(d, templateFor(d)); touchDoc(); const st = $('#content').scrollTop; renderView(); $('#content').scrollTop = st; return; }
   if (el.dataset.uifont !== undefined) { S.settings.uiFont = el.value; applyUiFont(); save(); return; }
   if (el.dataset.docqr !== undefined && UI.ed) { UI.ed.doc.showQR = el.checked; touchDoc(); renderPreview(true); toast(t(el.checked ? 'qrOnMsg' : 'qrOffMsg')); return; }
   if (el.dataset.dsqr !== undefined) { S.settings.showQR = el.checked; save(); if (window.dCanvas) dCanvas(); toast(t(el.checked ? 'qrOnMsg' : 'qrOffMsg')); return; }
@@ -570,7 +573,9 @@ document.addEventListener('input', e => {
     setPath(d, el.dataset.f, v); touchDoc(); updateEditorTotals(); renderPreview();
   } else if (el.dataset.it !== undefined && UI.ed) {
     const it = UI.ed.doc.items[+el.dataset.it]; const k = el.dataset.k;
+    if (k === 'perNight') return;
     it[k] = k === 'nights' ? (el.value.trim() === '' ? '' : num(el.value)) : ['qty', 'price', 'discount'].includes(k) ? (el.value.trim() === '' ? 0 : num(el.value)) : el.value;
+    if (['desc', 'unit', 'price', 'qty'].includes(k)) { const tp = templateFor(UI.ed.doc); const before = it.nights; syncStay(UI.ed.doc, tp); if ((before === undefined) !== (it.nights === undefined)) { touchDoc(); const st = $('#content').scrollTop; const f = document.activeElement; const sel = f && f.selectionStart; renderView(); $('#content').scrollTop = st; const nf = $(`[data-it="${el.dataset.it}"][data-k="${k}"]`); if (nf) { nf.focus(); try { nf.setSelectionRange(sel, sel); } catch (e) {} } return; } }
     touchDoc(); updateEditorTotals(); renderPreview();
   } else if (el.dataset.s !== undefined && el.type !== 'checkbox') {
     setPath(S.settings, el.dataset.s, el.dataset.num !== undefined ? num(el.value) : el.value); save();

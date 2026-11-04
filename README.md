@@ -1,12 +1,12 @@
-# Bestinvoice 1.4
+# Bestinvoice 1.5
 
 <p align="center"><img src="src/logo.svg" width="96" alt="Bestinvoice"></p>
 
 **Bestinvoice** — Thai / English receipt, tax invoice, invoice and quotation maker. Runs on **Windows**, **macOS**, or in any browser, fully offline. Drag-and-drop receipt designer, business templates (hotel check-in/out, restaurant slip, clinic, car service…), 6 paper sizes with auto layout, signed QR bill verification, 5 color themes.
 
-| ออกบิลโรงแรม (เช็คอิน/เช็คเอาท์อัตโนมัติ) | ออกแบบใบเสร็จแบบลากวาง |
+| ใบเสร็จโรงแรม A5 แนวนอน | ออกแบบใบเสร็จแบบลากวาง |
 |---|---|
-| ![editor](docs/editor-hotel.png) | ![designer](docs/designer.png) |
+| ![hotel](docs/hotel-a5.png) | ![designer](docs/designer.png) |
 | **ตรวจสอบบิลด้วย QR** | **ธีมสี 5 แบบ** |
 | ![verify](docs/verify.png) | ![themes](docs/themes.png) |
 
@@ -16,9 +16,9 @@
 
 | เครื่อง | วิธีเปิด |
 |---|---|
-| **Windows** | ดับเบิลคลิก `Bestinvoice-Portable-1.4.0.exe` (ไฟล์เดียว) หรือเปิดโฟลเดอร์ `Windows` แล้วดับเบิลคลิก `Bestinvoice.exe` |
-| **Mac (M1/M2/M3/M4)** | คัดลอก `Bestinvoice-1.4.0-macOS-AppleSilicon.zip` ไปที่ Mac แล้วดับเบิลคลิกเพื่อแตกไฟล์ ลาก `Bestinvoice.app` ไปไว้ใน Applications |
-| **Mac (Intel)** | ใช้ไฟล์ `Bestinvoice-1.4.0-macOS-Intel.zip` แบบเดียวกัน |
+| **Windows** | ดับเบิลคลิก `Bestinvoice-Portable-1.5.0.exe` (ไฟล์เดียว) หรือเปิดโฟลเดอร์ `Windows` แล้วดับเบิลคลิก `Bestinvoice.exe` |
+| **Mac (M1/M2/M3/M4)** | คัดลอก `Bestinvoice-1.5.0-macOS-AppleSilicon.zip` ไปที่ Mac แล้วดับเบิลคลิกเพื่อแตกไฟล์ ลาก `Bestinvoice.app` ไปไว้ใน Applications |
+| **Mac (Intel)** | ใช้ไฟล์ `Bestinvoice-1.5.0-macOS-Intel.zip` แบบเดียวกัน |
 | **เครื่องไหนก็ได้** | ดับเบิลคลิก `Bestinvoice.html` เปิดในเบราว์เซอร์ Chrome / Edge / Safari ได้เลย ไม่ต้องติดตั้ง ใช้งานแบบออฟไลน์ |
 
 **Mac ครั้งแรก:** เพราะโปรแกรมยังไม่ได้ลงทะเบียนกับ Apple ให้ *คลิกขวา › Open › Open*
@@ -36,6 +36,11 @@
 - แบบฟอร์มสำเร็จรูป: มินิมอล, คลาสสิก, โมเดิร์น, A5, สลิป 80 มม.
 - รายการเยอะเกินหน้า → แบ่งหน้าอัตโนมัติ พร้อมเลขหน้า
 - ข้อมูลเก็บในเครื่อง, ดาวน์โหลด/นำเข้าไฟล์สำรองได้ (ย้ายข้าม Mac/Windows ได้), เวอร์ชันเดสก์ท็อปสำรองอัตโนมัติทุกวัน (เมนู File › Open backup folder)
+
+## ใหม่ในเวอร์ชัน 1.5
+- **แม่แบบโรงแรมใหม่ (A5 แนวนอน)** แบบสมุดใบเสร็จมาตรฐาน: เลขที่/วันที่ (วันที่แบบเต็ม) · ห้อง / เข้าพักวันที่ / ออกวันที่ · ตารางหัวฟ้า ช่องจำนวน “1 ห้อง / 1 วัน” · กรอบ “จำนวนเงิน (ตัวอักษร) … รวมเงิน … บาท” · ผู้รับเงิน/ผู้จัดการ (แบบ A4 เดิมยังมีชื่อ “โรงแรม / รีสอร์ท (A4 โมเดิร์น)”)
+- **คำนวณคืน × ห้องแม่นขึ้น**: รายการค่าห้องถูกจับได้ทั้งจากหน่วย (ห้อง/คืน) และชื่อรายการ (ห้องพัก, ค่าห้อง, เตียง…) · ทุกรายการมีสวิตช์ “คิดตามจำนวนคืน” เปิด/ปิดเองได้ และแสดงสูตร เช่น “400 × 2 ห้อง × 3 คืน = 2,400.00” · เปลี่ยนจำนวนคืน/ห้อง/วันเช็คเอาท์ ยอดอัปเดตทันที
+- ตัวเลือกแบบฟอร์มใหม่: ภาษาบนเอกสารเฉพาะแบบฟอร์ม, วันที่แบบเต็ม, ไม่แสดงทศนิยมเมื่อเป็นจำนวนเต็ม, ซ่อนช่องข้อมูลบางช่องจากการพิมพ์
 
 ## ใหม่ในเวอร์ชัน 1.4
 - ตารางรายการในหน้าออกเอกสาร: ชื่อรายการเต็มบรรทัด ไม่เบียดแล้ว (จำนวน/หน่วย/ราคา อยู่บรรทัดล่าง) — ตัดช่อง “คืน” และ “ส่วนลดรายรายการ” ออก จำนวนคืนดึงจากข้อมูลการเข้าพักด้านบนอัตโนมัติ
