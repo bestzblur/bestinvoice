@@ -47,7 +47,9 @@ function englishText(amount) {
 }
 
 /* ---------- money maths ---------- */
-function lineAmount(it) { return r2(num(it.qty) * num(it.price) - num(it.discount)); }
+const isNightly = unit => /คืน|night/i.test(String(unit || ''));
+const nightsOf = it => (it.nights !== undefined && it.nights !== '' && num(it.nights) > 0) ? num(it.nights) : 1;
+function lineAmount(it) { return r2(num(it.qty) * num(it.price) * nightsOf(it) - num(it.discount)); }
 function calcDoc(doc) {
   const rate = num(doc.vatRate ?? S.settings.vatRate);
   const subtotal = r2((doc.items || []).reduce((a, it) => a + lineAmount(it), 0));
@@ -148,9 +150,9 @@ function autoLayout(tpl, paper) {
     if (extra) { const h = Math.max(6, nExtra * 3.6 + 2); put(extra, m, y, cw, h, { border: false }); y += h + 1; }
     put(items, m, y, cw, 40); y += 42;
     put(totals, m, y, cw, 34); y += 35;
-    put(words, m, y, cw, 8, { align: 'center' }); y += 9;
-    put(pay, m, y, cw, 6); y += 7;
-    put(notes, m, y, cw, 10); y += 11;
+    put(words, m, y, cw, 8, { align: 'center', alignGrand: false, padX: 0 }); y += 9;
+    put(pay, m, y, cw, 6, { follow: '' }); y += 7;
+    put(notes, m, y, cw, 10, { follow: '' }); y += 11;
     for (const tx of thanks) { put(tx, m, y, cw, 10, { align: 'center' }); y += 11; }
     if (qr) { put(qr, W / 2 - 14, y, 28, hasQr ? 32 : 0); if (hasQr) y += 34; }
     put(sig, m, y, cw, 22, { count: 1 });
@@ -169,7 +171,7 @@ function autoLayout(tpl, paper) {
     put(totals, m + cw * .62, fy, cw * .38, 22);
     put(words, m, fy, cw * .58, 7, { align: 'left' });
     put(qr, m + cw * .58 - 20, fy - .5, hasQr ? 20 : 0, hasQr ? 24.5 : 0);
-    put(words, m, fy, cw * .58 - (hasQr ? 22 : 0), 7, { align: 'left' });
+    put(words, m, fy, cw * .58 - (hasQr ? 22 : 0), 7, { align: 'left', alignGrand: false, padX: 0 });
     put(sig, m, fy + 8, cw * .58 - (hasQr ? 22 : 0), 14, { count: Math.min(2, (sig && sig.p.count) || 2), dateLine: false });
     if (pay && !placed.has(pay)) put(pay, m, fy - 4, 0, 0, { hidden: true });
     put(notes, m, fy, 0, 0, { hidden: true });
@@ -214,10 +216,11 @@ function autoLayout(tpl, paper) {
     const qs = hasQr ? r1(Math.min(footH - 2, 22 * sp.fs + 4)) : 0;
     if (qr) put(qr, m + lw - qs, y, qs ? qs - 3.5 : 0, qs);
     const lw0 = lw; lw = lw - (qs ? qs + 2 : 0);
-    let ly = y; const wh = 11 * sp.fs + 2;
-    put(words, m, ly, lw, wh); ly += wh + 2;
-    if (pay && !placed.has(pay)) { put(pay, m, ly, lw, 8 * sp.fs); ly += 8 * sp.fs + 2; }
-    put(notes, m, ly, lw, Math.max(8, y + footH - ly));
+    const wy = y + 11 * sp.fs, wh = 10 * sp.fs + 1;
+    put(words, m, wy, lw, wh, { alignGrand: true, pad: 0, padX: 2.5, align: 'center' });
+    let ly = wy + wh + 2;
+    if (pay && !placed.has(pay)) { put(pay, m, ly, lw, 7 * sp.fs, { follow: 'words' }); ly += 7 * sp.fs + 2; }
+    put(notes, m, ly, lw, Math.max(8, y + footH - ly), { follow: 'words' });
     for (const tx of thanks) put(tx, m, ly, lw, 0, { hidden: true });
     if (!placed.has(sig)) put(sig, m, H - m - sigH, cw, sigH);
   }
@@ -228,7 +231,7 @@ function autoLayout(tpl, paper) {
 
 /* ---------- extra header fields (check-in, table no., plate no. …) ---------- */
 const F = (k, th, en, type = 'text') => ({ k, th, en, type });
-const EXTRA_TYPES = ['text', 'number', 'date', 'checkin', 'nights', 'checkout'];
+const EXTRA_TYPES = ['text', 'number', 'date', 'checkin', 'nights', 'rooms', 'checkout'];
 
 /* ---------- template presets ---------- */
 function B(type, x, y, w, h, p = {}) { return { id: uid(), type, x, y, w, h, p }; }
@@ -240,7 +243,7 @@ const PRESET_DEFS = {
   slip:       { th: 'สลิป 80 มม.', en: '80 mm slip', style: 'minimal', paper: '80mm', accent: '#111111', font: 'plex', thanks: 'ขอบคุณที่ใช้บริการ\nThank you!', items: { headerBg: 'transparent', headerText: '#111111' }, noSig: true },
   // business templates
   hotel:      { biz: 1, icon: '🏨', th: 'โรงแรม / รีสอร์ท', en: 'Hotel / Resort', style: 'band', paper: 'A4', accent: '#A47E3B', font: 'plex', sig: ['customerSign', 'receiver'],
-                extra: [F('checkin', 'วันเช็คอิน', 'Check-in', 'checkin'), F('checkout', 'วันเช็คเอาท์', 'Check-out', 'checkout'), F('nights', 'จำนวนคืน', 'Nights', 'nights'), F('room', 'ห้องพัก', 'Room')],
+                extra: [F('checkin', 'วันเช็คอิน', 'Check-in', 'checkin'), F('checkout', 'วันเช็คเอาท์', 'Check-out', 'checkout'), F('nights', 'จำนวนคืน', 'Nights', 'nights'), F('rooms', 'จำนวนห้อง', 'Rooms', 'rooms'), F('room', 'เลขห้อง', 'Room no.')],
                 notes: 'เช็คอิน 14:00 น. / เช็คเอาท์ 12:00 น.', items: { headerBg: '#F6EFE2', headerText: '#5E4520', striped: true } },
   restaurant: { biz: 1, icon: '🍜', th: 'ร้านอาหาร / คาเฟ่', en: 'Restaurant / Café', style: 'minimal', paper: '80mm', accent: '#D9622B', font: 'plex', thanks: 'ขอบคุณที่มาอุดหนุน\nThank you, see you again!',
                 extra: [F('table', 'โต๊ะ', 'Table'), F('guests', 'จำนวนลูกค้า', 'Guests', 'number')], items: { headerBg: 'transparent', headerText: '#111111' }, noSig: true },
@@ -291,7 +294,13 @@ function syncStay(doc, tpl, changed) {
     if (ng) ex[ng.k] = Math.max(1, n);
     if (n < 1) ex[co.k] = addDays(ex[ci.k], 1);
   } else if (co) ex[co.k] = addDays(ex[ci.k], nights);
-  if (ng) { ex[ng.k] = Math.max(1, parseInt(ex[ng.k]) || 1); for (const it of doc.items) if (/^(คืน|night|nights)$/i.test(String(it.unit).trim())) it.qty = ex[ng.k]; }
+  const rm = fs.find(f => f.type === 'rooms');
+  if (rm) ex[rm.k] = Math.max(1, parseInt(ex[rm.k]) || 1);
+  if (ng) {
+    ex[ng.k] = Math.max(1, parseInt(ex[ng.k]) || 1);
+    // room lines: amount = price × rooms (qty) × nights
+    for (const it of doc.items) if (isNightly(it.unit)) { it.nights = ex[ng.k]; if (rm && (changed === 'rooms' || it.qty === undefined || it.qty === '')) it.qty = ex[rm.k]; }
+  }
 }
 function ensureExtra(doc) { const tpl = templateFor(doc); doc.extra = doc.extra || {}; syncStay(doc, tpl); }
 

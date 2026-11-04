@@ -206,7 +206,7 @@ function templateSelect(d) {
 }
 function extraInput(f, d) {
   const v = (d.extra || {})[f.k] ?? ''; const lab = esc(LANG === 'en' ? f.en : f.th);
-  if (f.type === 'nights') return `<div class="field"><span>${lab}</span><div class="stepper"><button class="btn icon" data-act="ednights" data-v="-1">−</button><input class="inp num" data-ex="${f.k}" data-extype="nights" value="${esc(v || 1)}" inputmode="numeric"><button class="btn icon" data-act="ednights" data-v="1">+</button></div></div>`;
+  if (f.type === 'nights' || f.type === 'rooms') return `<div class="field"><span>${lab}</span><div class="stepper"><button class="btn icon" data-act="edstep" data-k="${f.k}" data-v="-1">−</button><input class="inp num" data-ex="${f.k}" data-extype="${f.type}" value="${esc(v || 1)}" inputmode="numeric"><button class="btn icon" data-act="edstep" data-k="${f.k}" data-v="1">+</button></div></div>`;
   const date = ['date', 'checkin', 'checkout'].includes(f.type);
   return `<label class="field"><span>${lab}</span><input class="inp${f.type === 'number' ? ' num' : ''}" ${date ? 'type="date"' : ''} data-ex="${f.k}" data-extype="${f.type}" value="${esc(v)}" ${f.type === 'number' ? 'inputmode="numeric"' : ''}></label>`;
 }
@@ -219,10 +219,11 @@ function productChips(q) {
 }
 function addProductToDoc(p) {
   const d = UI.ed.doc; const tpl = templateFor(d); const ng = (tpl.extraFields || []).find(f => f.type === 'nights');
-  const nightly = /^(คืน|night|nights)$/i.test(String(p.unit).trim()) && ng ? (parseInt((d.extra || {})[ng.k]) || 1) : 1;
+  const rm = (tpl.extraFields || []).find(f => f.type === 'rooms'); const ex = d.extra || {};
+  const stay = isNightly(p.unit) && ng;
   const same = d.items.find(it => it.desc === p.name && num(it.price) === num(p.price));
-  if (same) same.qty = nightly > 1 ? nightly : num(same.qty) + 1;
-  else { const empty = d.items.find(it => !it.desc.trim() && !num(it.price)); const it = empty || { id: uid(), discount: 0 }; Object.assign(it, { desc: p.name, unit: p.unit, price: p.price, qty: nightly }); if (!empty) d.items.push(it); }
+  if (same) same.qty = num(same.qty) + 1;
+  else { const empty = d.items.find(it => !it.desc.trim() && !num(it.price)); const it = empty || { id: uid(), discount: 0 }; Object.assign(it, { desc: p.name, unit: p.unit, price: p.price, qty: stay && rm ? (parseInt(ex[rm.k]) || 1) : 1 }); if (stay) it.nights = parseInt(ex[ng.k]) || 1; if (!empty) d.items.push(it); }
   touchDoc(); const st = $('#content').scrollTop; renderView(); $('#content').scrollTop = st; toast('✓ ' + t('added'));
 }
 function custMatches(q) { q = q.trim().toLowerCase(); return S.customers.filter(c => !q || (c.name + ' ' + c.taxId + ' ' + c.phone + ' ' + (c.contact || '')).toLowerCase().includes(q)).slice(0, 8); }
@@ -281,10 +282,10 @@ function viewEditor(c) {
             <div class="grid g3"><label class="field"><span>${t('taxId')}</span><input class="inp" data-f="customer.taxId" value="${esc(d.customer.taxId)}" inputmode="numeric"></label><label class="field"><span>${t('branch')}</span><input class="inp" data-f="customer.branch" value="${esc(d.customer.branch)}" placeholder="${t('headOffice')}"></label><label class="field"><span>${t('phone')}</span><input class="inp" data-f="customer.phone" value="${esc(d.customer.phone)}"></label></div>
           </div></div>
         <div class="card card-b sec"><h4><span class="n">3</span>${t('s3')}</h4>
-          <table class="items"><thead><tr><th></th><th>${t('desc')}</th><th style="width:70px">${t('qty')}</th><th style="width:70px">${t('unit')}</th><th style="width:100px">${t('price')}</th><th style="width:80px">${t('disc')}</th><th style="width:96px;text-align:right">${t('lineTotal')}</th><th style="width:30px"></th></tr></thead>
+          <table class="items"><thead><tr><th></th><th>${t('desc')}</th><th style="width:70px">${hasStay ? t('qtyRooms') : t('qty')}</th>${hasStay ? `<th style="width:60px">${t('nightsCol')}</th>` : ''}<th style="width:70px">${t('unit')}</th><th style="width:100px">${t('price')}</th><th style="width:80px">${t('disc')}</th><th style="width:96px;text-align:right">${t('lineTotal')}</th><th style="width:30px"></th></tr></thead>
           <tbody id="items-body">${d.items.map((it, i) => `<tr draggable="true" data-row="${i}"><td class="h" title="${t('dragToSort')}">${ico('grip', 16)}</td>
             <td><textarea class="inp" rows="1" list="dl-products" data-it="${i}" data-k="desc" data-grow placeholder="${t('desc')}">${esc(it.desc)}</textarea></td>
-            <td><input class="inp sm num" data-it="${i}" data-k="qty" value="${it.qty}" inputmode="decimal"></td>
+            <td><input class="inp sm num" data-it="${i}" data-k="qty" value="${it.qty}" inputmode="decimal"></td>${hasStay ? `<td><input class="inp sm num" data-it="${i}" data-k="nights" value="${it.nights ?? ''}" placeholder="–" inputmode="numeric" title="${esc(t('roomCalc'))}"></td>` : ''}
             <td><input class="inp sm" data-it="${i}" data-k="unit" value="${esc(it.unit)}"></td>
             <td><input class="inp sm num" data-it="${i}" data-k="price" value="${it.price}" inputmode="decimal"></td>
             <td><input class="inp sm num" data-it="${i}" data-k="discount" value="${it.discount || ''}" inputmode="decimal" placeholder="0"></td>
@@ -438,9 +439,10 @@ function viewSettings(c) {
     </div></div>
     <div class="card"><div class="card-h"><h3>${ico('gear')} ${t('appSettings')}</h3></div><div class="card-b grid">
       <div class="field"><span>${t('theme')}</span><div class="themes">${THEMES.map(k => `<button class="theme-sw${(S.settings.theme || 'minimal') === k ? ' on' : ''}" data-act="theme" data-v="${k}"><i class="sw-${k}"><b></b><s></s></i>${t('th_' + k)}</button>`).join('')}</div></div>
+      <label class="field" style="max-width:320px"><span>${t('uiFont')}</span><select class="inp" data-uifont>${sel(Object.keys(FONTS).map(k => [k, FONT_LABELS[k]]), S.settings.uiFont || 'plex')}</select></label>
       <div class="field"><span>${t('uiLang')}</span><div class="seg" style="align-self:flex-start"><button data-act="lang" data-v="th" class="${LANG === 'th' ? 'on' : ''}">ไทย</button><button data-act="lang" data-v="en" class="${LANG === 'en' ? 'on' : ''}">English</button></div></div>
       <div class="field"><span>${t('backup')}</span><small>${t('backupHint')}</small><div style="display:flex;gap:10px;flex-wrap:wrap;margin-top:6px"><button class="btn" data-act="export">${ico('download', 16)}${t('exportBackup')}</button><button class="btn" data-act="import">${ico('upload', 16)}${t('importBackup')}</button><button class="btn" data-act="sample">${ico('sparkle', 16)}${t('loadSample')}</button>${window.bestinvoiceNative ? `<button class="btn" data-act="openbackups">${ico('layers', 16)}${LANG === 'th' ? 'เปิดโฟลเดอร์สำรองอัตโนมัติ' : 'Open auto-backup folder'}</button>` : ''}<button class="btn danger" data-act="reset">${ico('trash', 16)}${t('resetAll')}</button></div></div>
-      <div class="hint">Bestinvoice 1.2 · macOS · Windows · ${LANG === 'th' ? 'ใช้งานได้แบบออฟไลน์' : 'Works offline'}</div>
+      <div class="hint">Bestinvoice 1.3 · macOS · Windows · ${LANG === 'th' ? 'ใช้งานได้แบบออฟไลน์' : 'Works offline'}</div>
     </div></div>
   </div>`;
   $$('[data-grow]', c).forEach(autoGrow);
@@ -466,7 +468,7 @@ const ACT = {
   edaddcust: () => addCustomerFromDoc(),
   edaddprod: el => addProductToDoc(S.products.find(p => p.id === el.dataset.id)),
   ednewprod: () => editProduct(null, p => { addProductToDoc(p); }),
-  ednights: el => { const inp = $('[data-extype="nights"]'); inp.value = Math.max(1, (parseInt(inp.value) || 1) + +el.dataset.v); inp.dispatchEvent(new Event('input', { bubbles: true })); },
+  edstep: el => { const inp = $(`[data-ex="${el.dataset.k}"]`); inp.value = Math.max(1, (parseInt(inp.value) || 1) + +el.dataset.v); inp.dispatchEvent(new Event('input', { bubbles: true })); },
   theme: el => setTheme(el.dataset.v),
   themepick: el => dropdown(el, THEMES.map(k => ({ label: (S.settings.theme === k ? '✓ ' : '') + t('th_' + k), icon: 'sparkle', run: () => setTheme(k) }))),
   edsavecust: () => { const d = UI.ed.doc; if (!d.customer.name.trim()) return; const c = { id: uid(), name: d.customer.name.trim(), taxId: d.customer.taxId, branch: d.customer.branch, address: d.customer.address, phone: d.customer.phone, email: '', contact: '' }; S.customers.push(c); d.customerId = c.id; touchDoc(); toast(t('saved')); renderShell(); },
@@ -496,6 +498,7 @@ document.addEventListener('click', e => {
 document.addEventListener('change', e => {
   const el = e.target;
   if (el.dataset.uichange) { UI[el.dataset.uichange] = el.value; UI.page = 1; renderView(); return; }
+  if (el.dataset.uifont !== undefined) { S.settings.uiFont = el.value; applyUiFont(); save(); return; }
   if (el.dataset.docqr !== undefined && UI.ed) { UI.ed.doc.showQR = el.checked; touchDoc(); renderPreview(true); toast(t(el.checked ? 'qrOnMsg' : 'qrOffMsg')); return; }
   if (el.dataset.dsqr !== undefined) { S.settings.showQR = el.checked; save(); if (window.dCanvas) dCanvas(); toast(t(el.checked ? 'qrOnMsg' : 'qrOffMsg')); return; }
   if (el.dataset.f === 'templateId' && UI.ed) {
@@ -526,10 +529,10 @@ document.addEventListener('input', e => {
   if (el.id === 'qa-filter') { $('#qa-chips').innerHTML = productChips(el.value); return; }
   if (el.dataset.ex !== undefined && UI.ed) {
     const d = UI.ed.doc, tp = templateFor(d); d.extra = d.extra || {}; d.extra[el.dataset.ex] = el.value;
-    if (['checkin', 'nights', 'checkout'].includes(el.dataset.extype)) {
+    if (['checkin', 'nights', 'checkout', 'rooms'].includes(el.dataset.extype)) {
       syncStay(d, tp, el.dataset.extype);
-      $$('[data-ex]').forEach(i => { if (i !== el && ['checkin', 'nights', 'checkout'].includes(i.dataset.extype)) i.value = d.extra[i.dataset.ex] ?? ''; });
-      d.items.forEach((it, i) => { const q = $(`[data-it="${i}"][data-k="qty"]`); if (q && document.activeElement !== q) q.value = it.qty; });
+      $$('[data-ex]').forEach(i => { if (i !== el && ['checkin', 'nights', 'checkout', 'rooms'].includes(i.dataset.extype)) i.value = d.extra[i.dataset.ex] ?? ''; });
+      d.items.forEach((it, i) => { for (const k of ['qty', 'nights']) { const q = $(`[data-it="${i}"][data-k="${k}"]`); if (q && document.activeElement !== q) q.value = it[k] ?? ''; } });
     }
     touchDoc(); updateEditorTotals(); renderPreview(); return;
   }
@@ -542,7 +545,7 @@ document.addEventListener('input', e => {
     setPath(d, el.dataset.f, v); touchDoc(); updateEditorTotals(); renderPreview();
   } else if (el.dataset.it !== undefined && UI.ed) {
     const it = UI.ed.doc.items[+el.dataset.it]; const k = el.dataset.k;
-    it[k] = ['qty', 'price', 'discount'].includes(k) ? (el.value.trim() === '' ? 0 : num(el.value)) : el.value;
+    it[k] = k === 'nights' ? (el.value.trim() === '' ? '' : num(el.value)) : ['qty', 'price', 'discount'].includes(k) ? (el.value.trim() === '' ? 0 : num(el.value)) : el.value;
     touchDoc(); updateEditorTotals(); renderPreview();
   } else if (el.dataset.s !== undefined && el.type !== 'checkbox') {
     setPath(S.settings, el.dataset.s, el.dataset.num !== undefined ? num(el.value) : el.value); save();
@@ -555,6 +558,7 @@ window.addEventListener('keydown', e => { if ((e.ctrlKey || e.metaKey) && e.key.
 
 /* ---------- themes ---------- */
 const THEMES = ['minimal', 'pastel', 'modern', 'classic', 'glass'];
+function applyUiFont() { const k = S.settings.uiFont || 'plex'; document.documentElement.style.setProperty('--font', `${FONTS[k] || FONTS.plex},'Plex Thai','Leelawadee UI','Thonburi',system-ui,sans-serif`); }
 function setTheme(k) { S.settings.theme = k; document.documentElement.dataset.theme = k; save(); if (UI.view === 'settings') renderView(); }
 
 /* customer combobox keyboard / mouse */
@@ -578,7 +582,7 @@ function preloadFonts() {
   return Promise.all(loads).then(() => document.fonts.ready);
 }
 function boot() {
-  loadState(); document.documentElement.lang = LANG; document.documentElement.dataset.theme = S.settings.theme || 'minimal';
+  loadState(); document.documentElement.lang = LANG; document.documentElement.dataset.theme = S.settings.theme || 'minimal'; applyUiFont();
   ensureSecret();
   FONTS_READY = preloadFonts();
   renderShell();

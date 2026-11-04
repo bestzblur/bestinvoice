@@ -21,7 +21,7 @@ const BLOCK_TYPES = [
 ];
 const curTpl = () => S.templates.find(x => x.id === D.tplId) || S.templates[0];
 const selBlock = () => curTpl().blocks.find(b => b.id === D.sel);
-function previewDocument() { if (D.docId !== 'sample') { const d = S.documents.find(x => x.id === D.docId); if (d) return d; } const s = sampleDoc(); s.docLang = S.settings.docLang; return s; }
+function previewDocument() { if (D.docId !== 'sample') { const d = S.documents.find(x => x.id === D.docId); if (d) return d; } const s = sampleDoc(curTpl()); s.docLang = S.settings.docLang; return s; }
 
 function pushUndo() { const tp = curTpl(); D.undo.push(JSON.stringify(tp)); if (D.undo.length > 80) D.undo.shift(); D.redo = []; tp.edited = true; }
 function applySnapshot(json) { const tp = curTpl(); const o = JSON.parse(json); Object.assign(tp, o); if (!tp.blocks.find(b => b.id === D.sel)) D.sel = null; save(); dRender(); }
@@ -79,7 +79,6 @@ function dFit() {
   $('#d-sizer').style.width = pw * PX_MM * D.z + 'px'; $('#d-sizer').style.height = (page ? page.offsetHeight : ph * PX_MM) * D.z + 'px';
 }
 window.dFit = dFit;
-window.dCanvas = (...a) => dCanvas(...a);
 
 function dCanvas() {
   const tp = curTpl(); const doc = previewDocument();
@@ -110,7 +109,7 @@ function dProps() {
         ${field(LANG === 'th' ? 'รูปแบบหัวบิล' : 'Header style', `<select class="inp sm" data-tpstyle>${sel([['minimal', LANG === 'th' ? 'มินิมอล (ชิดซ้าย)' : 'Minimal (left)'], ['classic', LANG === 'th' ? 'คลาสสิก (กึ่งกลาง มีกรอบ)' : 'Classic (centered, boxed)'], ['band', LANG === 'th' ? 'แถบสีด้านบน' : 'Color band']], tp.style || 'minimal')}</select>`)}
         <button class="btn sm" data-act="drelayout">${ico('layout', 15)}${t('relayout')}</button>
         <div class="prop-row">${field(t('accent'), `<input type="color" class="inp" data-tp="accent" value="${tp.accent}">`)}${field(t('baseSize'), numIn('data-tp', 'base', tp.base))}</div>
-        ${field(t('docFont'), `<select class="inp sm" data-tp="font">${sel([['plex', 'IBM Plex Sans Thai'], ['sarabun', 'Sarabun (TH Sarabun style)']], tp.font)}</select>`)}
+        <div class="field"><span>${t('docFont')}</span><div class="fonts">${Object.keys(FONTS).map(k => `<button class="font-btn${(tp.font || 'plex') === k ? ' on' : ''}" data-font="${k}" style="font-family:${FONTS[k]},sans-serif"><b>ใบเสร็จ 123</b><small>${FONT_LABELS[k]}</small></button>`).join('')}</div></div>
       </div></div>
       <div class="prop-group"><b>${t('extraFields')}</b>
         <div class="xf-list">${(tp.extraFields || []).map((f, i) => `<div class="xf-row"><input class="inp sm" data-xf="${i}" data-xk="th" value="${esc(f.th)}" placeholder="ไทย"><input class="inp sm" data-xf="${i}" data-xk="en" value="${esc(f.en)}" placeholder="English"><select class="inp sm" data-xf="${i}" data-xk="type">${sel(EXTRA_TYPES.map(x => [x, t('ft_' + x)]), f.type)}</select><button class="menu-btn" data-xfdel="${i}" title="${t('delete')}">${ico('x', 14)}</button></div>`).join('')}</div>
@@ -149,7 +148,8 @@ function dProps() {
     ${spec ? `<div class="prop-group">${spec}</div>` : ''}
     <div class="prop-group"><b>${t('text')}</b>
       <div class="prop-row">${field(t('fontSize'), numIn('data-pp', 'size', p.size || tp.base))}${field(t('color'), color('data-pp', 'color', p.color, '#111111'))}</div>
-      ${field(t('align'), align)}<div style="height:8px"></div>${tog('bold', t('bold'), p.bold)}
+      ${field(t('blockFont'), `<select class="inp sm" data-pp="font">${sel([['', t('followTpl')], ...Object.keys(FONTS).map(k => [k, FONT_LABELS[k]])], p.font || '')}</select>`)}<div style="height:8px"></div>
+      ${field(t('align'), align)}<div style="height:8px"></div>${tog('bold', t('bold'), p.bold)}${b.type === 'words' ? tog('alignGrand', t('alignGrand'), p.alignGrand) : ''}${b.type === 'notes' || b.type === 'payment' ? tog('follow', t('followWords'), p.follow === 'words') : ''}
     </div>
     <div class="prop-group"><b>${LANG === 'th' ? 'กรอบและพื้นหลัง' : 'Box & background'}</b>
       <div class="prop-row">${field(t('bg'), color('data-pp', 'bg', p.bg === 'accent' ? tp.accent : p.bg, '#ffffff'))}${field(t('padding'), numIn('data-pp', 'pad', p.pad || 0))}</div>
@@ -234,7 +234,7 @@ function wireDesigner() {
     const move = ev => {
       const dx = (ev.clientX - start.x) / (PX_MM * D.z), dy = (ev.clientY - start.y) / (PX_MM * D.z);
       if (!moved && Math.abs(dx) + Math.abs(dy) < .4) return;
-      if (!moved) { moved = true; pushUndo(); }
+      if (!moved) { moved = true; pushUndo(); if (b.p.alignGrand) b.p.alignGrand = false; if (b.p.follow) b.p.follow = ''; }
       const snap = !ev.altKey; const rnd = v => snap ? Math.round(v * 2) / 2 : Math.round(v * 10) / 10;
       let { x, y, w, h } = start.b; const gx = [], gy = [];
       if (!dir) {
@@ -293,13 +293,14 @@ function wireDesigner() {
     if (el.dataset.xf !== undefined && el.tagName === 'SELECT') { pushUndo(); curTpl().extraFields[+el.dataset.xf].type = el.value; dRefresh(); return; }
     if (el.dataset.tpstyle !== undefined) { pushUndo(); setTplStyle(curTpl(), el.value); save(); dRender(); return; }
     if (!b) return;
-    if (el.type === 'checkbox' && el.dataset.pp) { pushUndo(); b.p[el.dataset.pp] = el.checked; dRefresh(); if (el.dataset.pp === 'hidden') dLayers(); return; }
+    if (el.type === 'checkbox' && el.dataset.pp) { pushUndo(); b.p[el.dataset.pp] = el.dataset.pp === 'follow' ? (el.checked ? 'words' : '') : el.checked; dRefresh(); if (el.dataset.pp === 'hidden') dLayers(); return; }
     if (el.tagName === 'SELECT' && el.dataset.pp) { pushUndo(); b.p[el.dataset.pp] = el.dataset.int !== undefined ? +el.value : el.value; if (el.dataset.pp === 'count') { b.p.labels = b.p.labels || []; while (b.p.labels.length < b.p.count) b.p.labels.push('receiver'); } dRefresh(); dProps(); return; }
     if (el.dataset.siglabel !== undefined) { pushUndo(); b.p.labels = b.p.labels || []; b.p.labels[+el.dataset.siglabel] = el.value === '__custom' ? (LANG === 'th' ? 'ลงชื่อ' : 'Signature') : el.value; dRefresh(); dProps(); }
   });
   props.addEventListener('click', e => {
     const b = selBlock(); const tp = curTpl();
     const pb = e.target.closest('[data-paper]'); if (pb) { changePaper(pb.dataset.paper); return; }
+    const fb = e.target.closest('[data-font]'); if (fb) { pushUndo(); tp.font = fb.dataset.font; save(); dRender(); return; }
     const xd = e.target.closest('[data-xfdel]'); if (xd) { pushUndo(); tp.extraFields.splice(+xd.dataset.xfdel, 1); save(); dRender(); return; }
     const al = e.target.closest('[data-align]'); if (al && b) { pushUndo(); b.p.align = al.dataset.align; dRefresh(); dProps(); return; }
     const kd = e.target.closest('[data-kind]'); if (kd && b) { pushUndo(); b.p.kind = kd.dataset.kind; if (kd.dataset.kind === 'rect' && b.h < 3) b.h = 12; if (kd.dataset.kind === 'line') b.h = .5; dRefresh(); dProps(); return; }

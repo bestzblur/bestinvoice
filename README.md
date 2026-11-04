@@ -1,4 +1,4 @@
-# Bestinvoice 1.2
+# Bestinvoice 1.3
 
 <p align="center"><img src="src/logo.svg" width="96" alt="Bestinvoice"></p>
 
@@ -16,9 +16,9 @@
 
 | เครื่อง | วิธีเปิด |
 |---|---|
-| **Windows** | ดับเบิลคลิก `Bestinvoice-Portable-1.2.0.exe` (ไฟล์เดียว) หรือเปิดโฟลเดอร์ `Windows` แล้วดับเบิลคลิก `Bestinvoice.exe` |
-| **Mac (M1/M2/M3/M4)** | คัดลอก `Bestinvoice-1.2.0-macOS-AppleSilicon.zip` ไปที่ Mac แล้วดับเบิลคลิกเพื่อแตกไฟล์ ลาก `Bestinvoice.app` ไปไว้ใน Applications |
-| **Mac (Intel)** | ใช้ไฟล์ `Bestinvoice-1.2.0-macOS-Intel.zip` แบบเดียวกัน |
+| **Windows** | ดับเบิลคลิก `Bestinvoice-Portable-1.3.0.exe` (ไฟล์เดียว) หรือเปิดโฟลเดอร์ `Windows` แล้วดับเบิลคลิก `Bestinvoice.exe` |
+| **Mac (M1/M2/M3/M4)** | คัดลอก `Bestinvoice-1.3.0-macOS-AppleSilicon.zip` ไปที่ Mac แล้วดับเบิลคลิกเพื่อแตกไฟล์ ลาก `Bestinvoice.app` ไปไว้ใน Applications |
+| **Mac (Intel)** | ใช้ไฟล์ `Bestinvoice-1.3.0-macOS-Intel.zip` แบบเดียวกัน |
 | **เครื่องไหนก็ได้** | ดับเบิลคลิก `Bestinvoice.html` เปิดในเบราว์เซอร์ Chrome / Edge / Safari ได้เลย ไม่ต้องติดตั้ง ใช้งานแบบออฟไลน์ |
 
 **Mac ครั้งแรก:** เพราะโปรแกรมยังไม่ได้ลงทะเบียนกับ Apple ให้ *คลิกขวา › Open › Open*
@@ -36,6 +36,12 @@
 - แบบฟอร์มสำเร็จรูป: มินิมอล, คลาสสิก, โมเดิร์น, A5, สลิป 80 มม.
 - รายการเยอะเกินหน้า → แบ่งหน้าอัตโนมัติ พร้อมเลขหน้า
 - ข้อมูลเก็บในเครื่อง, ดาวน์โหลด/นำเข้าไฟล์สำรองได้ (ย้ายข้าม Mac/Windows ได้), เวอร์ชันเดสก์ท็อปสำรองอัตโนมัติทุกวัน (เมนู File › Open backup folder)
+
+## ใหม่ในเวอร์ชัน 1.3
+- **โรงแรม: คิดเงิน ราคาห้อง × จำนวนห้อง × จำนวนคืน** (เช่น 500 × 1 ห้อง × 2 คืน = 1,000 / 500 × 2 ห้อง × 3 คืน = 3,000) — เพิ่มช่อง “จำนวนห้อง” และคอลัมน์ “คืน” ในตาราง; เปลี่ยนจำนวนคืน/ห้อง/วันเช็คเอาท์ ยอดอัปเดตทันที (สินค้าที่หน่วยมีคำว่า “คืน” เช่น “ห้อง/คืน” จะคิดแบบนี้อัตโนมัติ)
+- **เลือกฟอนต์ได้ 7 แบบ**: IBM Plex Sans Thai, Sarabun, Kanit, Bai Jamjuree, Noto Sans Thai, Noto Sans Thai Looped, Google Sans — ตั้งได้ทั้งแบบฟอร์ม, รายกล่อง และฟอนต์ของโปรแกรม
+- **หน้าใบเสร็จมาตรฐานขึ้น**: คำอ่านจำนวนเงินภาษาไทยอยู่แถวเดียวกับ “จำนวนเงินรวมทั้งสิ้น”, หมายเหตุ/วิธีชำระเงินวางต่อด้านล่าง, คอลัมน์ “ลำดับ” ไม่เบียดแล้ว
+- แก้: หน้าออกแบบใบเสร็จแสดงข้อมูลตัวอย่างไม่ได้ (เวอร์ชัน 1.2) — ตอนนี้ดูตัวอย่างได้ รวมถึงข้อมูลเข้าพักของแบบฟอร์มโรงแรม
 
 ## ใหม่ในเวอร์ชัน 1.2
 - **QR ตรวจสอบบิล**: สแกนด้วยมือถือจะขึ้น “✅ บิลเลขที่ … ผ่านการตรวจสอบ” พร้อมยอดเงิน
@@ -57,6 +63,7 @@
 ```
 src/             โค้ดโปรแกรม (HTML/CSS/JS ล้วน ไม่ใช้ framework)
 build.js         รวมทุกอย่าง (รวมฟอนต์และไลบรารี) เป็นไฟล์เดียว dist/Bestinvoice.html
+fonts/           ฟอนต์เอกสาร (ตัดเหลือไทย+อังกฤษ, woff2) + ไฟล์สัญญาอนุญาต OFL
 electron/        ตัวห่อแอปเดสก์ท็อป (main.js, preload.js, ไอคอน)
 scripts/         สคริปต์แพ็กแอป Windows / macOS
 
@@ -69,4 +76,5 @@ cd electron && npm run build:mac   # (บน Mac) .dmg
 ```
 ข้อมูลทั้งหมดเก็บในเครื่องผู้ใช้ (localStorage / โฟลเดอร์ userData ของแอป) ไม่มีการส่งข้อมูลออกนอกเครื่อง
 
-**Third-party:** baht.js © Manassarn Manoonchai (MIT) · qrcode-generator © Kazuhiko Arase (MIT) · jsQR © Cozmo (Apache-2.0) · IBM Plex Sans Thai, Sarabun (SIL Open Font License) · Electron (MIT)
+**Third-party:** baht.js © Manassarn Manoonchai (MIT) · qrcode-generator © Kazuhiko Arase (MIT) · jsQR © Cozmo (Apache-2.0) · Electron (MIT)  
+Fonts: IBM Plex Sans Thai, Sarabun, Kanit, Bai Jamjuree, Noto Sans Thai, Noto Sans Thai Looped, Google Sans — SIL Open Font License 1.1 (see `fonts/licenses/`)

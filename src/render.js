@@ -1,5 +1,6 @@
 /* Bestinvoice — document renderer (shared by preview, print and designer) */
-const FONTS = { plex: "'Plex Thai'", sarabun: "'Sarabun Thai'" };
+const FONTS = { plex: "'Plex Thai'", sarabun: "'BI sarabun'", kanit: "'BI kanit'", bai: "'BI bai'", noto: "'BI noto'", notolooped: "'BI notolooped'", googlesans: "'BI googlesans'" };
+const FONT_LABELS = { plex: 'IBM Plex Sans Thai', sarabun: 'Sarabun', kanit: 'Kanit', bai: 'Bai Jamjuree', noto: 'Noto Sans Thai', notolooped: 'Noto Sans Thai Looped', googlesans: 'Google Sans' };
 function lum(hex) {
   const m = /^#?([0-9a-f]{6})$/i.exec(hex || ''); if (!m) return 1;
   const n = parseInt(m[1], 16), c = [n >> 16, (n >> 8) & 255, n & 255].map(v => { v /= 255; return v <= .03928 ? v / 12.92 : Math.pow((v + .055) / 1.055, 2.4); });
@@ -8,7 +9,8 @@ function lum(hex) {
 const onColor = bg => (bg && bg !== 'transparent' && lum(bg) < .45) ? '#FFFFFF' : '#111111';
 const resolveColor = (v, tpl) => (!v || v === 'accent') ? tpl.accent : v === 'accentSoft' ? `color-mix(in srgb, ${tpl.accent} 9%, white)` : v;
 
-function sampleDoc() {
+const SAMPLE_EXTRA = { room: '1205', table: 'A7', guests: 2, plate: 'กข 1234 กรุงเทพฯ', car: 'Toyota Yaris', mileage: 45210, project: 'ออกแบบเว็บไซต์บริษัท', period: 'พ.ย. – ธ.ค. 2569', hn: 'HN-00451', doctor: 'นพ. ใจดี รักษา', student: 'ด.ญ. มีนา ตั้งใจ', course: 'คณิตศาสตร์ ม.3', term: '2/2569', month: 'พฤศจิกายน 2569', meter: 'น้ำ 120 / ไฟ 845' };
+function sampleDoc(tpl) {
   const d = {
     id: 'sample', type: 'taxreceipt', number: 'RT' + String(new Date().getFullYear() + 543).slice(-2) + '11-0001', date: todayISO(), dueDate: addDays(todayISO(), 30), reference: 'PO-2026-118',
     status: 'paid', customer: { name: 'บริษัท ตัวอย่าง ลูกค้า อินเตอร์เทรด แอนด์ เซอร์วิส จำกัด', taxId: '0105560000000', branch: 'สำนักงานใหญ่', address: '123 ถนนสาทรใต้ แขวงยานนาวา เขตสาทร กรุงเทพฯ 10120', phone: '02-000-0000' },
@@ -17,8 +19,14 @@ function sampleDoc() {
       { id: 'b', desc: 'ดูแลเว็บไซต์รายเดือน (พ.ย.)', qty: 1, unit: 'เดือน', price: 4500, discount: 0 },
       { id: 'c', desc: 'ถ่ายภาพสินค้า', qty: 12, unit: 'ภาพ', price: 350, discount: 200 }
     ],
-    discount: 0, vatMode: 'exclusive', vatRate: S.settings.vatRate, whtRate: 3, payMethod: 'transfer', notes: 'ขอบคุณที่ใช้บริการ', docLang: S.settings.docLang
+    discount: 0, vatMode: 'exclusive', vatRate: S.settings.vatRate, whtRate: 3, payMethod: 'transfer', notes: 'ขอบคุณที่ใช้บริการ', docLang: S.settings.docLang, extra: {}
   };
+  const fs = (tpl && tpl.extraFields) || [];
+  for (const f of fs) d.extra[f.k] = ['date', 'checkin', 'checkout'].includes(f.type) ? d.date : f.type === 'nights' ? 3 : f.type === 'rooms' ? 2 : f.type === 'number' ? (SAMPLE_EXTRA[f.k] ?? 1) : (SAMPLE_EXTRA[f.k] ?? (LANG === 'en' ? 'Sample' : 'ตัวอย่าง'));
+  if (fs.some(f => f.type === 'checkin')) {
+    d.items = [{ id: 'a', desc: 'ห้องดีลักซ์ วิวทะเล', qty: 2, unit: 'ห้อง/คืน', price: 500, discount: 0 }, { id: 'b', desc: 'อาหารเช้า (ต่อท่าน)', qty: 4, unit: 'ท่าน', price: 150, discount: 0 }];
+    d.whtRate = 0; syncStay(d, tpl);
+  }
   return d;
 }
 
@@ -35,9 +43,11 @@ function blockStyle(b, tpl) {
   if (p.align) st.push(`text-align:${p.align}`);
   if (p.color) st.push(`color:${p.color}`);
   if (p.bold) st.push('font-weight:700');
+  if (p.font && FONTS[p.font]) st.push(`font-family:${FONTS[p.font]},'Plex Thai',sans-serif`);
   if (p.bg) st.push(`background:${resolveColor(p.bg, tpl)}`);
   if (p.border) st.push(`border:.3mm solid ${p.borderColor || '#9aa1ab'}`);
   if (p.pad) st.push(`padding:${p.pad}mm`);
+  if (p.padX) st.push(`padding-left:${p.padX}mm;padding-right:${p.padX}mm`);
   if (p.radius) st.push(`border-radius:${p.radius}mm`);
   return st.join(';');
 }
@@ -96,20 +106,22 @@ function renderBlock(b, ctx) {
       const bd = p.grid ? 'border:.2mm solid #b9bfc7;' : '';
       if (p.compact) {
         let h = `<table class="it"><thead><tr style="border-bottom:.25mm dashed #111"><th style="padding:1mm 0">${L2('desc', lang)}</th><th class="r" style="padding:1mm 0">${L2('amount', lang)}</th></tr></thead><tbody>`;
-        for (const it of items) h += `<tr><td style="padding:.8mm 0;border:0">${esc(it.desc)}<div class="k" style="font-size:.9em">${money(it.qty, num(it.qty) % 1 ? 2 : 0)} × ${money(it.price)}${num(it.discount) ? ' − ' + money(it.discount) : ''}</div></td><td class="r" style="padding:.8mm 0;border:0">${money(lineAmount(it))}</td></tr>`;
+        for (const it of items) h += `<tr><td style="padding:.8mm 0;border:0">${esc(it.desc)}<div class="k" style="font-size:.9em">${money(it.qty, num(it.qty) % 1 ? 2 : 0)} × ${money(it.price)}${nightsOf(it) > 1 || (it.nights && isNightly(it.unit)) ? ` × ${nightsOf(it)} ${lang === 'en' ? 'nights' : 'คืน'}` : ''}${num(it.discount) ? ' − ' + money(it.discount) : ''}</div></td><td class="r" style="padding:.8mm 0;border:0">${money(lineAmount(it))}</td></tr>`;
         return h + `</tbody></table><div style="border-top:.25mm dashed #111;margin-top:1mm"></div>`;
       }
       const cols = [];
-      if (p.showNo !== false) cols.push(['idx', 'c', '11mm']);
+      const hasNights = items.some(it => it.nights !== undefined && it.nights !== '' && num(it.nights) > 0);
+      if (p.showNo !== false) cols.push(['idx', 'c', '14mm']);
       cols.push(['desc', '', '']);
       cols.push(['qty', 'c', '15mm']);
-      if (p.showUnit !== false) cols.push(['unit', 'c', '14mm']);
+      if (hasNights) cols.push(['nights', 'c', '13mm']);
+      if (p.showUnit !== false) cols.push(['unit', 'c', '18mm']);
       cols.push(['price', 'r', '22mm']);
       if (hasDisc) cols.push(['disc', 'r', '17mm']);
       cols.push(['amount', 'r', '24mm']);
       let h = `<table class="it"><thead><tr style="background:${hb};color:${ht}">` + cols.map(c => `<th class="${c[1]}" style="${c[2] ? 'width:' + c[2] + ';' : ''}${bd}">${L2(c[0], lang)}</th>`).join('') + `</tr></thead><tbody>`;
       const rows = items.map((it, i) => {
-        const cell = { idx: (ctx.rowOffset || 0) + i + 1, desc: nl2br(it.desc), qty: money(it.qty, num(it.qty) % 1 ? 2 : 0), unit: esc(it.unit), price: money(it.price), disc: num(it.discount) ? money(it.discount) : '', amount: money(lineAmount(it)) };
+        const cell = { idx: (ctx.rowOffset || 0) + i + 1, desc: nl2br(it.desc), qty: money(it.qty, num(it.qty) % 1 ? 2 : 0), unit: esc(it.unit), nights: (it.nights !== undefined && it.nights !== '') ? money(it.nights, 0) : '', price: money(it.price), disc: num(it.discount) ? money(it.discount) : '', amount: money(lineAmount(it)) };
         return `<tr style="${p.striped && i % 2 ? 'background:#F6F7F9' : ''}">` + cols.map(c => `<td class="${c[1]}" style="${bd}">${cell[c[0]]}</td>`).join('') + '</tr>';
       });
       for (let i = items.length; i < (ctx.rowOffset ? 0 : (ctx.fillTo !== undefined ? Math.min(ctx.fillTo, p.minRows || 0) : (p.minRows || 0))); i++) rows.push('<tr>' + cols.map(() => `<td style="${bd}">&nbsp;</td>`).join('') + '</tr>');
@@ -129,8 +141,8 @@ function renderBlock(b, ctx) {
     case 'words': {
       const th = bahtText(calc.total), en = englishText(calc.total);
       const txt = lang === 'en' ? en : lang === 'th' ? th : null;
-      if (txt) return `<div style="font-weight:600">(${esc(txt)})</div>`;
-      return `<div style="font-weight:600">(${esc(th)})</div><div style="font-size:.85em;opacity:.8">(${esc(en)})</div>`;
+      if (txt) return `<div class="w1">(${esc(txt)})</div>`;
+      return `<div class="w1">(${esc(th)})</div><div class="w2">(${esc(en)})</div>`;
     }
     case 'extra': {
       const fs = tpl.extraFields || []; const ex = doc.extra || {};
@@ -191,7 +203,7 @@ function renderPage(doc, tpl, opts = {}) {
     if (b.type === 'items') cls.push('items-blk');
     if (opts.design && b.id === opts.selected) cls.push('sel');
     if (opts.design && b.p && b.p.hidden) cls.push('hid');
-    const fit = b.p && b.p.fit ? ' data-fit="1"' : '';
+    const fit = (b.p && b.p.fit ? ' data-fit="1"' : '') + (b.p && b.p.alignGrand ? ' data-align-grand="1"' : '') + (b.p && b.p.follow ? ` data-follow="${b.p.follow}"` : '');
     let inner = renderBlock(b, ctx);
     if (b.type === 'items') inner = `<div class="items-inner">${inner}</div>`;
     if (opts.design) inner += `<span class="tagname">${esc(t('b_' + b.type))}</span>`;
@@ -202,12 +214,24 @@ function renderPage(doc, tpl, opts = {}) {
 }
 
 /* Post-layout: shrink long names to fit, grow the items table and push blocks below it down */
-function applyFlow(pageEl, opts = {}) {
+function fitText(pageEl) {
   pageEl.querySelectorAll('[data-fit]').forEach(el => {
     let fs = parseFloat(el.style.fontSize) || 9, guard = 0;
-    while (el.scrollHeight > el.clientHeight + 1 && fs > 5 && guard++ < 60) { fs -= .25; el.style.fontSize = fs + 'pt'; }
+    while ((el.scrollHeight > el.clientHeight + 1 || el.scrollWidth > el.clientWidth + 1) && fs > 5 && guard++ < 60) { fs -= .25; el.style.fontSize = fs + 'pt'; }
   });
-  if (opts.design) return;
+}
+/* Standard Thai receipt: amount-in-words sits on the same row as the grand total; notes/payment follow below it */
+function alignWords(pageEl) {
+  const w = pageEl.querySelector('.blk-words[data-align-grand]'), tb = pageEl.querySelector('.blk-totals'), g = tb && tb.querySelector('.grand');
+  if (!w || !g) return;
+  w.style.top = (tb.offsetTop + g.offsetTop) + 'px'; w.style.height = g.offsetHeight + 'px';
+  const pxmm = pageEl.offsetWidth / (PAPERS[pageEl.dataset.paper] || PAPERS.A4)[0];
+  let y = w.offsetTop + w.offsetHeight + 1.8 * pxmm;
+  [...pageEl.querySelectorAll('.blk[data-follow="words"]')].sort((a, b) => parseFloat(a.dataset.y) - parseFloat(b.dataset.y))
+    .forEach(b => { b.style.top = y + 'px'; y += b.offsetHeight + 1.5 * pxmm; });
+}
+function applyFlow(pageEl, opts = {}) {
+  if (opts.design) { alignWords(pageEl); fitText(pageEl); return; }
   const it = pageEl.querySelector('.items-blk');
   let extra = 0;
   if (it) {
@@ -219,6 +243,7 @@ function applyFlow(pageEl, opts = {}) {
       it.style.height = need + 'px'; extra = delta;
     }
   }
+  alignWords(pageEl); fitText(pageEl);
   // grow the page if content runs past the bottom (slips grow; A4 continues onto the next sheet)
   let maxBottom = 0;
   pageEl.querySelectorAll('.blk').forEach(b => { maxBottom = Math.max(maxBottom, b.offsetTop + b.offsetHeight); });
