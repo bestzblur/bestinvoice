@@ -388,7 +388,7 @@ function wireDesigner() {
     const b = selBlock(); const tp = curTpl();
     const ga = e.target.closest('[data-galign]'); if (ga) { groupAlign(ga.dataset.galign); return; }
     const pb = e.target.closest('[data-paper]'); if (pb) { changePaper(pb.dataset.paper); return; }
-    const fb = e.target.closest('[data-font]'); if (fb) { pushUndo(); tp.font = fb.dataset.font; save(); dRender(); return; }
+    const fb = e.target.closest('[data-font]'); if (fb) { pushUndo(); tp.font = fb.dataset.font; let n = 0; for (const b of tp.blocks) if (b.p.font) { delete b.p.font; n++; } save(); dRender(); toast(t('fontAll')); return; }
     const xd = e.target.closest('[data-xfdel]'); if (xd) { pushUndo(); tp.extraFields.splice(+xd.dataset.xfdel, 1); save(); dRender(); return; }
     const al = e.target.closest('[data-align]'); if (al && b) { pushUndo(); b.p.align = al.dataset.align; dRefresh(); dProps(); return; }
     const kd = e.target.closest('[data-kind]'); if (kd && b) { pushUndo(); b.p.kind = kd.dataset.kind; if (kd.dataset.kind === 'rect' && b.h < 3) b.h = 12; if (kd.dataset.kind === 'line') b.h = .5; dRefresh(); dProps(); return; }

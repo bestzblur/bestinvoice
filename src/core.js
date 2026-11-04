@@ -274,7 +274,7 @@ const PRESET_DEFS = {
 /* Thai receipt-book layout for hotels / guesthouses, A5 landscape (210 × 148 mm) */
 function hotelReceiptBook() {
   return [
-    B('company', 12, 8, 82, 30, { size: 9.5, nameSize: 13.5, showEn: false, showAddress: true, showTaxId: true, showContact: true, fit: true, font: 'kanit' }),
+    B('company', 12, 8, 82, 30, { size: 9.5, nameSize: 13.5, showEn: false, showAddress: true, showTaxId: true, showContact: true, fit: true }),
     B('logo', 96, 7, 26, 26),
     B('title', 126, 8, 72, 12, { size: 18, bold: true, align: 'right', copyTag: false, fit: true }),
     B('docinfo', 142, 22, 56, 11, { size: 10.5, boldLabels: true, showDue: false, showRef: false }),
@@ -385,6 +385,11 @@ function migrate() {
       const n = makeTemplate('hotel'); const keepFont = tp.font, keepAccent = tp.accent;
       Object.assign(tp, { blocks: n.blocks, extraFields: n.extraFields, font: keepFont || n.font, accent: keepAccent || n.accent });
     }
+    save();
+  }
+  if (!S.migrations.fontFollow) { // company block on the hotel template followed Kanit instead of the template font
+    S.migrations.fontFollow = 1;
+    for (const tp of S.templates) if (tp.preset === 'hotel') for (const b of tp.blocks) if (b.type === 'company' && b.p.font === 'kanit') delete b.p.font;
     save();
   }
   if (!S.migrations.hotelV7) { // bigger verification QR (easier to scan)
