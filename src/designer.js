@@ -1,6 +1,6 @@
 /* Bestinvoice — drag & drop receipt designer */
 const PX_MM = 96 / 25.4;
-const D = { tplId: null, sel: null, zoom: 'fit', z: 1, grid: true, undo: [], redo: [], docId: 'sample' };
+const D = { tplId: null, sel: null, multi: [], zoom: 'fit', z: 1, grid: true, undo: [], redo: [], docId: 'sample' };
 const BLOCK_TYPES = [
   ['company', 'building', 90, 30, { nameSize: 13, showEn: true, showAddress: true, showTaxId: true, showContact: true, fit: true }],
   ['logo', 'logo', 22, 22, {}],
@@ -67,7 +67,7 @@ function dToolbar() {
 
 function dLayers() {
   const tp = curTpl();
-  $('#d-layers').innerHTML = [...tp.blocks].reverse().map(b => `<button data-layer="${b.id}" class="${b.id === D.sel ? 'on' : ''}">${ico((BLOCK_TYPES.find(x => x[0] === b.type) || [])[1] || 'shape', 15)}${esc(t('b_' + b.type))}<span class="eye" data-eye="${b.id}">${ico(b.p.hidden ? 'eyeoff' : 'eye', 15)}</span></button>`).join('');
+  $('#d-layers').innerHTML = [...tp.blocks].reverse().map(b => `<button data-layer="${b.id}" class="${b.id === D.sel || D.multi.includes(b.id) ? 'on' : ''}">${ico((BLOCK_TYPES.find(x => x[0] === b.type) || [])[1] || 'shape', 15)}${esc(t('b_' + b.type))}<span class="eye" data-eye="${b.id}">${ico(b.p.hidden ? 'eyeoff' : 'eye', 15)}</span></button>`).join('');
 }
 
 function dFit() {
@@ -83,8 +83,15 @@ window.dFit = dFit;
 function dCanvas() {
   const tp = curTpl(); const doc = previewDocument();
   const stage = $('#d-stage');
-  stage.innerHTML = renderPage(doc, tp, { design: true, selected: D.sel, grid: D.grid, copy: 'original' });
+  D.multi = D.multi.filter(id => tp.blocks.some(b => b.id === id));
+  stage.innerHTML = renderPage(doc, tp, { design: true, selected: D.sel, multi: D.multi, grid: D.grid, copy: 'original' });
   applyFlow(stage.querySelector('.page'), { design: true });
+  if (D.multi.length > 1) {
+    const bs = tp.blocks.filter(b => D.multi.includes(b.id));
+    const x1 = Math.min(...bs.map(b => b.x)), y1 = Math.min(...bs.map(b => b.y)), x2 = Math.max(...bs.map(b => b.x + b.w)), y2 = Math.max(...bs.map(b => b.y + b.h));
+    const g = document.createElement('div'); g.id = 'd-groupbox'; g.style.cssText = `left:${x1}mm;top:${y1}mm;width:${x2 - x1}mm;height:${y2 - y1}mm`;
+    g.innerHTML = `<span>${D.multi.length} ${LANG === 'th' ? 'กล่อง' : 'blocks'}</span>`; stage.appendChild(g);
+  }
   const b = selBlock();
   if (b) {
     const box = document.createElement('div'); box.id = 'd-selbox';
@@ -97,6 +104,17 @@ function dCanvas() {
 
 function dProps() {
   const tp = curTpl(); const b = selBlock(); const P = $('#d-props');
+  if (D.multi.length > 1) {
+    const btn = (k, ic, lab) => `<button class="btn sm" data-galign="${k}" title="${esc(lab)}">${ico(ic, 15)}${esc(lab)}</button>`;
+    P.innerHTML = `<h5>${t('properties')}</h5>
+      <div class="prop-group"><b>${D.multi.length} ${LANG === 'th' ? 'กล่องที่เลือก' : 'blocks selected'}</b><div class="hint">${t('groupHint')}</div></div>
+      <div class="prop-group"><b>${t('alignGroup')}</b><div class="galign">
+        ${btn('left', 'alignL', t('gaLeft'))}${btn('hcenter', 'alignC', t('gaHCenter'))}${btn('right', 'alignR', t('gaRight'))}
+        ${btn('top', 'alignL', t('gaTop'))}${btn('vcenter', 'alignC', t('gaVCenter'))}${btn('bottom', 'alignR', t('gaBottom'))}
+        ${D.multi.length > 2 ? btn('hdist', 'layout', t('gaHDist')) + btn('vdist', 'layout', t('gaVDist')) : ''}</div></div>
+      <div class="prop-group"><div style="display:grid;grid-template-columns:1fr 1fr;gap:6px"><button class="btn sm" data-act="dgroupdup">${ico('copy', 15)}${t('duplicate')}</button><button class="btn sm danger" data-act="dgroupdel">${ico('trash', 15)}${t('delete')}</button></div></div>`;
+    return;
+  }
   const field = (label, html) => `<label class="field"><span>${label}</span>${html}</label>`;
   const numIn = (attr, key, val, step = 0.5) => `<input class="inp sm num" type="number" step="${step}" ${attr}="${key}" value="${val ?? ''}">`;
   const tog = (key, label, on) => `<label class="switch" style="margin-bottom:8px;font-size:12.5px"><input type="checkbox" data-pp="${key}" ${on ? 'checked' : ''}><i></i>${label}</label>`;
@@ -130,7 +148,7 @@ function dProps() {
     case 'docinfo': spec = `${tog('showDue', t('showDue'), p.showDue !== false)}${tog('showRef', t('showRef'), p.showRef !== false)}${tog('inline', LANG === 'th' ? 'แสดงบรรทัดเดียว' : 'Single line', p.inline)}`; break;
     case 'customer': spec = field(t('label') + (LANG === 'th' ? ' (เว้นว่าง = อัตโนมัติ)' : ' (blank = automatic)'), `<input class="inp sm" data-pp="label" value="${esc(p.label || '')}">`); break;
     case 'notes': spec = field(t('label'), `<input class="inp sm" data-pp="label" value="${esc(p.label || '')}">`); break;
-    case 'items': spec = `${p.stayQty ? `<div class="prop-row">${field(LANG === 'th' ? 'คำเรียกจำนวนคืน' : 'Word for nights', `<input class="inp sm" data-pp="nightWord" value="${esc(p.nightWord || '')}" placeholder="คืน">`)}</div>` : ''}${tog('stayQty', LANG === 'th' ? 'ช่องจำนวนแสดง “ห้อง / คืน” (โรงแรม)' : 'Qty cell shows rooms / nights (hotel)', p.stayQty)}${tog('bahtCol', LANG === 'th' ? 'คอลัมน์ “บาท” ท้ายตาราง' : '“THB” column at the end', p.bahtCol)}${tog('book', LANG === 'th' ? 'แบบสมุดใบเสร็จ (ไม่มีเส้นแถว, เส้นล่างสีหลัก)' : 'Receipt-book style', p.book)}<div class="prop-row">${field(t('headerColor'), color('data-pp', 'headerBg', resolveColor(p.headerBg, tp), tp.accent))}${field(t('color'), color('data-pp', 'headerText', p.headerText || onColor(resolveColor(p.headerBg, tp)), '#ffffff'))}</div><div class="prop-row">${field(t('minRows'), numIn('data-pp', 'minRows', p.minRows || 0, 1))}</div>${tog('showNo', t('showNo'), p.showNo !== false)}${tog('showUnit', t('showUnit'), p.showUnit !== false)}${tog('striped', t('striped'), p.striped)}${tog('grid', LANG === 'th' ? 'เส้นตารางทุกช่อง' : 'Cell borders', p.grid)}${tog('compact', LANG === 'th' ? 'แบบย่อ (สำหรับสลิป)' : 'Compact (for slips)', p.compact)}<div class="hint">${LANG === 'th' ? 'ถ้ารายการเยอะเกินกรอบ ตารางจะยืดลง และดันกล่องที่อยู่ด้านล่างลงให้อัตโนมัติ' : 'If items overflow, the table grows and pushes the blocks below it down automatically.'}</div>`; break;
+    case 'items': spec = `${p.stayQty ? `<div class="prop-row">${field(LANG === 'th' ? 'คำเรียกจำนวนคืน' : 'Word for nights', `<input class="inp sm" data-pp="nightWord" value="${esc(p.nightWord || '')}" placeholder="คืน">`)}</div>` : ''}${tog('stayQty', LANG === 'th' ? 'ช่องจำนวนแสดง “ห้อง / คืน” (โรงแรม)' : 'Qty cell shows rooms / nights (hotel)', p.stayQty)}${p.stayQty ? tog('hideNights', LANG === 'th' ? 'ไม่แสดงจำนวนคืนในตาราง (สรุปที่หัวบิล)' : 'Hide nights in the table (shown in header)', p.hideNights) : ''}${tog('bahtCol', LANG === 'th' ? 'คอลัมน์ “บาท” ท้ายตาราง' : '“THB” column at the end', p.bahtCol)}${tog('book', LANG === 'th' ? 'แบบสมุดใบเสร็จ (ไม่มีเส้นแถว, เส้นล่างสีหลัก)' : 'Receipt-book style', p.book)}<div class="prop-row">${field(t('headerColor'), color('data-pp', 'headerBg', resolveColor(p.headerBg, tp), tp.accent))}${field(t('color'), color('data-pp', 'headerText', p.headerText || onColor(resolveColor(p.headerBg, tp)), '#ffffff'))}</div><div class="prop-row">${field(t('minRows'), numIn('data-pp', 'minRows', p.minRows || 0, 1))}</div>${tog('showNo', t('showNo'), p.showNo !== false)}${tog('showUnit', t('showUnit'), p.showUnit !== false)}${tog('striped', t('striped'), p.striped)}${tog('grid', LANG === 'th' ? 'เส้นตารางทุกช่อง' : 'Cell borders', p.grid)}${tog('compact', LANG === 'th' ? 'แบบย่อ (สำหรับสลิป)' : 'Compact (for slips)', p.compact)}<div class="hint">${LANG === 'th' ? 'ถ้ารายการเยอะเกินกรอบ ตารางจะยืดลง และดันกล่องที่อยู่ด้านล่างลงให้อัตโนมัติ' : 'If items overflow, the table grows and pushes the blocks below it down automatically.'}</div>`; break;
     case 'totals': spec = field(LANG === 'th' ? 'รูปแบบ' : 'Style', `<select class="inp sm" data-pp="variant">${sel([['', LANG === 'th' ? 'รายการยอด + แถบยอดรวม' : 'Rows + total bar'], ['box', LANG === 'th' ? 'กรอบ “จำนวนเงิน … รวมเงิน … บาท”' : 'Box: amount in words … total']], p.variant || '')}</select>`) + '<div style="height:8px"></div>' + field(t('highlight'), color('data-pp', 'highlight', resolveColor(p.highlight, tp), tp.accent)); break;
     case 'signature': {
       const keys = ['receiver', 'payer', 'authorized', 'customerSign'];
@@ -169,6 +187,65 @@ function dProps() {
       </div></div>`;
 }
 
+function toggleMulti(id) {
+  const set = new Set(D.multi.length ? D.multi : (D.sel ? [D.sel] : []));
+  set.has(id) ? set.delete(id) : set.add(id);
+  D.multi = [...set]; D.sel = D.multi.length === 1 ? D.multi[0] : null; if (D.multi.length < 2) D.multi = [];
+}
+const pageMm = ev => { const r = $('#d-stage .page').getBoundingClientRect(); return { x: (ev.clientX - r.left) / (PX_MM * D.z), y: (ev.clientY - r.top) / (PX_MM * D.z) }; };
+function startMarquee(e, additive) {
+  const tp = curTpl(), st = $('#d-stage'), p0 = pageMm(e); let mq = null, moved = false;
+  const base = additive ? (D.multi.length ? D.multi : (D.sel ? [D.sel] : [])) : [];
+  const hits = (a) => tp.blocks.filter(b => { const x1 = Math.min(p0.x, a.x), x2 = Math.max(p0.x, a.x), y1 = Math.min(p0.y, a.y), y2 = Math.max(p0.y, a.y);
+    const inter = b.x < x2 && b.x + b.w > x1 && b.y < y2 && b.y + Math.max(b.h, .5) > y1;
+    const contains = b.x <= x1 && b.x + b.w >= x2 && b.y <= y1 && b.y + b.h >= y2; // e.g. a background band under the marquee
+    return inter && !contains; }).map(b => b.id);
+  const move = ev => {
+    const p = pageMm(ev); if (!moved && Math.abs(p.x - p0.x) + Math.abs(p.y - p0.y) < 1) return;
+    if (!mq) { mq = document.createElement('div'); mq.className = 'marquee'; st.appendChild(mq); moved = true; }
+    mq.style.cssText = `left:${Math.min(p0.x, p.x)}mm;top:${Math.min(p0.y, p.y)}mm;width:${Math.abs(p.x - p0.x)}mm;height:${Math.abs(p.y - p0.y)}mm`;
+    const ids = new Set([...base, ...hits(p)]);
+    $$('#d-stage .blk').forEach(el => el.classList.toggle('sel', ids.has(el.dataset.id)));
+  };
+  const up = ev => {
+    removeEventListener('pointermove', move); removeEventListener('pointerup', up);
+    if (!moved) { if (D.sel || D.multi.length) { D.sel = null; D.multi = []; dRender(); } return; }
+    const ids = [...new Set([...base, ...hits(pageMm(ev))])];
+    D.multi = ids.length > 1 ? ids : []; D.sel = ids.length === 1 ? ids[0] : null; dRender();
+  };
+  addEventListener('pointermove', move); addEventListener('pointerup', up);
+}
+function startGroupDrag(e) {
+  const tp = curTpl(); const bs = tp.blocks.filter(b => D.multi.includes(b.id)); const orig = bs.map(b => ({ b, x: b.x, y: b.y }));
+  const p0 = { x: e.clientX, y: e.clientY }; let moved = false;
+  const els = bs.map(b => $(`#d-stage .blk[data-id="${b.id}"]`)); const g = $('#d-groupbox'); const g0 = g ? { l: parseFloat(g.style.left), t: parseFloat(g.style.top) } : null;
+  const move = ev => {
+    let dx = (ev.clientX - p0.x) / (PX_MM * D.z), dy = (ev.clientY - p0.y) / (PX_MM * D.z);
+    if (!moved && Math.abs(dx) + Math.abs(dy) < .4) return;
+    if (!moved) { moved = true; pushUndo(); bs.forEach(b => { b.p.alignGrand = false; b.p.follow = ''; b.p.attach = ''; }); }
+    if (!ev.altKey) { dx = Math.round(dx * 2) / 2; dy = Math.round(dy * 2) / 2; }
+    orig.forEach((o, i) => { o.b.x = r2(o.x + dx); o.b.y = r2(o.y + dy); if (els[i]) { els[i].style.left = o.b.x + 'mm'; els[i].style.top = o.b.y + 'mm'; } });
+    if (g) { g.style.left = (g0.l + dx) + 'mm'; g.style.top = (g0.t + dy) + 'mm'; }
+  };
+  const up = () => { removeEventListener('pointermove', move); removeEventListener('pointerup', up); if (moved) { save(); dCanvas(); dProps(); dToolbar(); } };
+  addEventListener('pointermove', move); addEventListener('pointerup', up);
+}
+function groupAlign(how) {
+  const tp = curTpl(); const bs = tp.blocks.filter(b => D.multi.includes(b.id)); if (bs.length < 2) return;
+  pushUndo();
+  const x1 = Math.min(...bs.map(b => b.x)), x2 = Math.max(...bs.map(b => b.x + b.w)), y1 = Math.min(...bs.map(b => b.y)), y2 = Math.max(...bs.map(b => b.y + b.h));
+  for (const b of bs) {
+    if (how === 'left') b.x = x1; if (how === 'right') b.x = r2(x2 - b.w); if (how === 'hcenter') b.x = r2((x1 + x2) / 2 - b.w / 2);
+    if (how === 'top') b.y = y1; if (how === 'bottom') b.y = r2(y2 - b.h); if (how === 'vcenter') b.y = r2((y1 + y2) / 2 - b.h / 2);
+    b.p.alignGrand = false; b.p.follow = ''; b.p.attach = '';
+  }
+  if (how === 'hdist' || how === 'vdist') {
+    const k = how === 'hdist' ? 'x' : 'y', s = how === 'hdist' ? 'w' : 'h'; const sorted = [...bs].sort((a, b) => a[k] - b[k]);
+    const total = sorted.reduce((a, b) => a + b[s], 0), span = (how === 'hdist' ? x2 - x1 : y2 - y1), gap = (span - total) / (sorted.length - 1);
+    let pos = how === 'hdist' ? x1 : y1; for (const b of sorted) { b[k] = r2(pos); pos += b[s] + gap; }
+  }
+  save(); dRender();
+}
 function changePaper(paper) {
   const tp = curTpl(); if (tp.paper === paper) return;
   pushUndo(); autoLayout(tp, paper); D.sel = null; save(); dRender(); toast(t('autoLayoutHint'));
@@ -226,9 +303,14 @@ function wireDesigner() {
   wrap.addEventListener('pointerdown', e => {
     if (e.button !== 0) return;
     const hd = e.target.closest('.hd'); const blkEl = e.target.closest('#d-stage .blk');
-    if (!hd && !blkEl) { if (e.target.closest('#d-stage') || e.target === wrap || e.target.id === 'd-sizer') { if (D.sel) { D.sel = null; dRender(); } } return; }
     const tp = curTpl();
-    if (blkEl && !hd && blkEl.dataset.id !== D.sel) { D.sel = blkEl.dataset.id; dLayers(); dProps(); dCanvas(); }
+    if (!hd && !blkEl) { // rubber-band selection on empty space
+      if (!(e.target.closest('#d-stage') || e.target === wrap || e.target.id === 'd-sizer')) return;
+      e.preventDefault(); startMarquee(e, e.shiftKey || e.ctrlKey || e.metaKey); return;
+    }
+    if (blkEl && !hd && (e.shiftKey || e.ctrlKey || e.metaKey)) { e.preventDefault(); toggleMulti(blkEl.dataset.id); dRender(); return; }
+    if (blkEl && !hd && D.multi.length > 1 && D.multi.includes(blkEl.dataset.id)) { e.preventDefault(); startGroupDrag(e); return; }
+    if (blkEl && !hd && (blkEl.dataset.id !== D.sel || D.multi.length)) { D.sel = blkEl.dataset.id; D.multi = []; dLayers(); dProps(); dCanvas(); }
     const b = selBlock(); if (!b) return;
     e.preventDefault();
     const start = { x: e.clientX, y: e.clientY, b: { ...b } }; const dir = hd ? hd.dataset.hd : null;
@@ -237,7 +319,7 @@ function wireDesigner() {
     const move = ev => {
       const dx = (ev.clientX - start.x) / (PX_MM * D.z), dy = (ev.clientY - start.y) / (PX_MM * D.z);
       if (!moved && Math.abs(dx) + Math.abs(dy) < .4) return;
-      if (!moved) { moved = true; pushUndo(); if (b.p.alignGrand) b.p.alignGrand = false; if (b.p.follow) b.p.follow = ''; }
+      if (!moved) { moved = true; pushUndo(); if (b.p.alignGrand) b.p.alignGrand = false; if (b.p.follow) b.p.follow = ''; if (b.p.attach && !dir) b.p.attach = ''; }
       const snap = !ev.altKey; const rnd = v => snap ? Math.round(v * 2) / 2 : Math.round(v * 10) / 10;
       let { x, y, w, h } = start.b; const gx = [], gy = [];
       if (!dir) {
@@ -276,7 +358,7 @@ function wireDesigner() {
   });
   left.addEventListener('click', e => {
     const eye = e.target.closest('[data-eye]'); if (eye) { e.stopPropagation(); pushUndo(); const b = curTpl().blocks.find(x => x.id === eye.dataset.eye); b.p.hidden = !b.p.hidden; dRefresh(); dProps(); return; }
-    const ly = e.target.closest('[data-layer]'); if (ly) { D.sel = ly.dataset.layer; dRender(); }
+    const ly = e.target.closest('[data-layer]'); if (ly) { if (e.shiftKey || e.ctrlKey || e.metaKey) toggleMulti(ly.dataset.layer); else { D.sel = ly.dataset.layer; D.multi = []; } dRender(); }
   });
   let undoArmed = true;
   props.addEventListener('focusin', e => { if (e.target.matches('input,textarea,select')) undoArmed = true; });
@@ -304,6 +386,7 @@ function wireDesigner() {
   });
   props.addEventListener('click', e => {
     const b = selBlock(); const tp = curTpl();
+    const ga = e.target.closest('[data-galign]'); if (ga) { groupAlign(ga.dataset.galign); return; }
     const pb = e.target.closest('[data-paper]'); if (pb) { changePaper(pb.dataset.paper); return; }
     const fb = e.target.closest('[data-font]'); if (fb) { pushUndo(); tp.font = fb.dataset.font; save(); dRender(); return; }
     const xd = e.target.closest('[data-xfdel]'); if (xd) { pushUndo(); tp.extraFields.splice(+xd.dataset.xfdel, 1); save(); dRender(); return; }
@@ -339,6 +422,8 @@ window.DACT = {
   dfront: () => { const tp = curTpl(), b = selBlock(); pushUndo(); tp.blocks = tp.blocks.filter(x => x !== b).concat(b); dRefresh(); },
   dback: () => { const tp = curTpl(), b = selBlock(); pushUndo(); tp.blocks = [b].concat(tp.blocks.filter(x => x !== b)); dRefresh(); },
   ddup: () => { const tp = curTpl(), b = selBlock(); pushUndo(); const n = clone(b); n.id = uid(); n.x += 4; n.y += 4; tp.blocks.push(n); D.sel = n.id; save(); dRender(); },
+  dgroupdel: () => { const tp = curTpl(); pushUndo(); tp.blocks = tp.blocks.filter(b => !D.multi.includes(b.id)); D.multi = []; D.sel = null; save(); dRender(); },
+  dgroupdup: () => { const tp = curTpl(); pushUndo(); const n = tp.blocks.filter(b => D.multi.includes(b.id)).map(b => { const c = clone(b); c.id = uid(); c.x += 4; c.y += 4; return c; }); tp.blocks.push(...n); D.multi = n.map(b => b.id); save(); dRender(); },
   ddel: () => { const tp = curTpl(); pushUndo(); tp.blocks = tp.blocks.filter(x => x.id !== D.sel); D.sel = null; save(); dRender(); },
   dimg: async () => { const f = await pickFile('image/*'); if (!f) return; const b = selBlock(); pushUndo(); b.p.src = await readImage(f, 900); dRefresh(); }
 };
@@ -350,6 +435,15 @@ window.addEventListener('keydown', e => {
   if (mod && e.key.toLowerCase() === 'z' && !inField) { e.preventDefault(); e.shiftKey ? dRedo() : dUndo(); return; }
   if (mod && e.key.toLowerCase() === 'y' && !inField) { e.preventDefault(); dRedo(); return; }
   if (inField) return;
+  if (mod && e.key.toLowerCase() === 'a') { e.preventDefault(); D.multi = curTpl().blocks.map(b => b.id); D.sel = null; dRender(); return; }
+  if (D.multi.length > 1) {
+    if (e.key === 'Delete' || e.key === 'Backspace') { e.preventDefault(); DACT.dgroupdel(); return; }
+    if (e.key === 'Escape') { D.multi = []; dRender(); return; }
+    if (mod && e.key.toLowerCase() === 'd') { e.preventDefault(); DACT.dgroupdup(); return; }
+    const st = e.shiftKey ? 5 : 1; const m = { ArrowLeft: [-st, 0], ArrowRight: [st, 0], ArrowUp: [0, -st], ArrowDown: [0, st] }[e.key];
+    if (m) { e.preventDefault(); pushUndo(); for (const b of curTpl().blocks) if (D.multi.includes(b.id)) { b.x = r2(b.x + m[0]); b.y = r2(b.y + m[1]); b.p.attach = ''; } save(); dCanvas(); }
+    return;
+  }
   const b = selBlock(); if (!b) return;
   if (mod && e.key.toLowerCase() === 'd') { e.preventDefault(); DACT.ddup(); return; }
   if (e.key === 'Delete' || e.key === 'Backspace') { e.preventDefault(); DACT.ddel(); return; }

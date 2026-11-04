@@ -24,7 +24,7 @@ function sampleDoc(tpl) {
   const fs = (tpl && tpl.extraFields) || [];
   for (const f of fs) d.extra[f.k] = ['date', 'checkin', 'checkout'].includes(f.type) ? d.date : f.type === 'nights' ? 3 : f.type === 'rooms' ? 2 : f.type === 'number' ? (SAMPLE_EXTRA[f.k] ?? 1) : (SAMPLE_EXTRA[f.k] ?? (LANG === 'en' ? 'Sample' : 'ตัวอย่าง'));
   if (fs.some(f => f.type === 'checkin')) {
-    d.items = [{ id: 'a', desc: 'ห้องดีลักซ์ วิวทะเล', qty: 2, unit: 'ห้อง/คืน', price: 500, discount: 0 }, { id: 'b', desc: 'อาหารเช้า (ต่อท่าน)', qty: 4, unit: 'ท่าน', price: 150, discount: 0 }];
+    d.items = [{ id: 'a', desc: 'ห้องดีลักซ์ วิวทะเล', qty: 2, unit: 'ห้อง', price: 500, discount: 0 }, { id: 'b', desc: 'อาหารเช้า (ต่อท่าน)', qty: 4, unit: 'ท่าน', price: 150, discount: 0 }];
     d.whtRate = 0; syncStay(d, tpl);
   }
   return d;
@@ -127,10 +127,11 @@ function renderBlock(b, ctx) {
       if (p.bahtCol) cols.push(['baht', 'c', '10mm']);
       const M = ctx.M, nw = p.nightWord || (lang === 'en' ? 'nights' : 'คืน');
       const thLab = k => k === 'baht' ? '' : (p.stayQty && k === 'price' ? (lang === 'en' ? 'Unit price' : lang === 'th' ? 'หน่วยละ' : 'หน่วยละ<small>Unit price</small>') : p.stayQty && k === 'amount' ? (lang === 'en' ? 'Amount' : lang === 'th' ? 'รวมเป็นเงิน' : 'รวมเป็นเงิน<small>Amount</small>') : L2(k, lang));
-      let h = `<table class="it${p.book ? ' book' : ''}" style="${p.book ? `border-bottom:.6mm solid ${hb}` : ''}"><thead><tr style="${p.book ? '' : `background:${hb};`}color:${ht}">` + cols.map(c => `<th class="${p.book && c[0] !== 'amount' ? 'c' : c[1]}" style="${c[2] ? 'width:' + c[2] + ';' : ''}${bd}${p.book ? `background:${hb};` : ''}">${thLab(c[0])}</th>`).join('') + `</tr></thead><tbody>`;
+      let h = `<table class="it${p.book ? ' book' : ''}${ctx.tableScale < 1 ? ' tight' : ''}" style="${p.book ? `border-bottom:.6mm solid ${hb};` : ''}${ctx.tableScale < 1 ? `font-size:${ctx.tableScale}em;` : ''}"><thead><tr style="${p.book ? '' : `background:${hb};`}color:${ht}">` + cols.map(c => `<th class="${p.book && c[0] !== 'amount' ? 'c' : c[1]}" style="${c[2] ? 'width:' + c[2] + ';' : ''}${bd}${p.book ? `background:${hb};` : ''}">${thLab(c[0])}</th>`).join('') + `</tr></thead><tbody>`;
       const rows = items.map((it, i) => {
         const q = money(it.qty, num(it.qty) % 1 ? 2 : 0);
-        const qtyCell = p.stayQty ? `${q}${it.unit ? ' ' + esc(it.unit) : ''}${it.nights !== undefined && it.nights !== '' ? `<div style="margin-top:1.2mm">${money(it.nights, 0)} ${esc(nw)}</div>` : ''}` : q;
+        const nTxt = !p.hideNights && it.nights !== undefined && it.nights !== '' ? `${money(it.nights, 0)} ${esc(nw)}` : '';
+        const qtyCell = p.stayQty ? `${q}${it.unit ? ' ' + esc(it.unit) : ''}${nTxt ? (ctx.tableInline ? ` · ${nTxt}` : `<div style="margin-top:1.2mm">${nTxt}</div>`) : ''}` : q;
         const cell = { idx: (ctx.rowOffset || 0) + i + 1, desc: nl2br(it.desc), qty: qtyCell, baht: lang === 'en' ? 'THB' : 'บาท', unit: esc(it.unit), nights: (it.nights !== undefined && it.nights !== '') ? money(it.nights, 0) : '', price: M(it.price), disc: num(it.discount) ? M(it.discount) : '', amount: M(lineAmount(it)) };
         return `<tr style="${p.striped && i % 2 ? 'background:#F6F7F9' : ''}">` + cols.map(c => `<td class="${p.book && c[0] !== 'amount' ? 'c' : c[1]}" style="${bd}${p.book ? 'border-bottom:0;' : ''}">${cell[c[0]]}</td>`).join('') + '</tr>';
       });
@@ -222,7 +223,7 @@ function renderBlock(b, ctx) {
 
 function renderPage(doc, tpl, opts = {}) {
   const lang = tpl.docLang || doc.docLang || S.settings.docLang || 'both';
-  const ctx = { doc, co: S.settings.company, calc: opts.calc || calcDoc(doc), lang, tpl, design: !!opts.design, copy: opts.copy, rowOffset: opts.rowOffset || 0, fillTo: opts.fillTo,
+  const ctx = { doc, co: S.settings.company, calc: opts.calc || calcDoc(doc), lang, tpl, design: !!opts.design, copy: opts.copy, rowOffset: opts.rowOffset || 0, fillTo: opts.fillTo, tableInline: !!opts.tableInline, tableScale: opts.tableScale || 1,
     D: iso => fmtDate(iso, lang === 'en' ? 'en' : 'th', tpl.dateStyle === 'long' ? 'long' : 'short'), M: v => (tpl.intMoney && Math.abs(r2(v) % 1) < .001) ? money(v, 0) : money(v) };
   const [pw, ph] = PAPERS[tpl.paper] || PAPERS.A4;
   let h = `<div class="page${opts.grid ? ' grid-on' : ''}" data-paper="${tpl.paper}" style="width:${pw}mm;height:${ph}mm;--doc-font:${FONTS[tpl.font] || FONTS.plex};font-size:${tpl.base}pt">`;
@@ -231,9 +232,9 @@ function renderPage(doc, tpl, opts = {}) {
     if (opts.hideBelow !== undefined && b.y >= opts.hideBelow - .5) continue;
     const cls = ['blk', 'blk-' + b.type];
     if (b.type === 'items') cls.push('items-blk');
-    if (opts.design && b.id === opts.selected) cls.push('sel');
+    if (opts.design && (b.id === opts.selected || (opts.multi || []).includes(b.id))) cls.push('sel');
     if (opts.design && b.p && b.p.hidden) cls.push('hid');
-    const fit = (b.p && b.p.fit ? ' data-fit="1"' : '') + (b.p && b.p.alignGrand ? ' data-align-grand="1"' : '') + (b.p && b.p.follow ? ` data-follow="${b.p.follow}"` : '');
+    const fit = (b.p && b.p.fit ? ' data-fit="1"' : '') + (b.p && b.p.alignGrand ? ' data-align-grand="1"' : '') + (b.p && b.p.follow ? ` data-follow="${b.p.follow}"` : '') + (b.p && b.p.attach ? ` data-attach="${b.p.attach}"` : '');
     let inner = renderBlock(b, ctx);
     if (b.type === 'items') inner = `<div class="items-inner">${inner}</div>`;
     if (opts.design) inner += `<span class="tagname">${esc(t('b_' + b.type))}</span>`;
@@ -260,8 +261,28 @@ function alignWords(pageEl) {
   [...pageEl.querySelectorAll('.blk[data-follow="words"]')].sort((a, b) => parseFloat(a.dataset.y) - parseFloat(b.dataset.y))
     .forEach(b => { b.style.top = y + 'px'; y += b.offsetHeight + 1.5 * pxmm; });
 }
+/* blocks with data-attach="items" sit right under the real table (not the table's reserved area) */
+function attachToItems(pageEl) {
+  const it = pageEl.querySelector('.items-blk'); if (!it) return;
+  const pxmm = pageEl.offsetWidth / (PAPERS[pageEl.dataset.paper] || PAPERS.A4)[0];
+  const tableBottom = it.offsetTop + it.firstElementChild.offsetHeight;
+  pageEl.querySelectorAll('.blk[data-attach="items"]').forEach(b => { b.style.top = (tableBottom + 2 * pxmm) + 'px'; });
+}
+/* if the totals block is taller than its box, push anything it would overlap further down */
+function pushBelowTotals(pageEl) {
+  const tb = pageEl.querySelector('.blk-totals'); if (!tb) return;
+  const pxmm = pageEl.offsetWidth / (PAPERS[pageEl.dataset.paper] || PAPERS.A4)[0];
+  const bottom = tb.offsetTop + Math.max(tb.offsetHeight, tb.scrollHeight) + 1.5 * pxmm;
+  let need = 0;
+  pageEl.querySelectorAll('.blk').forEach(b => {
+    if (b === tb || b.classList.contains('blk-words') || b.dataset.follow || b.offsetTop < tb.offsetTop + 2) return;
+    const hOverlap = Math.min(b.offsetLeft + b.offsetWidth, tb.offsetLeft + tb.offsetWidth) - Math.max(b.offsetLeft, tb.offsetLeft) > 0;
+    if (hOverlap && b.offsetTop < bottom) need = Math.max(need, bottom - b.offsetTop);
+  });
+  if (need > 0) pageEl.querySelectorAll('.blk').forEach(b => { if (b !== tb && !b.classList.contains('blk-words') && !b.dataset.follow && b.offsetTop >= tb.offsetTop + 2) b.style.top = (b.offsetTop + need) + 'px'; });
+}
 function applyFlow(pageEl, opts = {}) {
-  if (opts.design) { alignWords(pageEl); fitText(pageEl); return; }
+  if (opts.design) { attachToItems(pageEl); alignWords(pageEl); fitText(pageEl); return; }
   const it = pageEl.querySelector('.items-blk');
   let extra = 0;
   if (it) {
@@ -273,15 +294,7 @@ function applyFlow(pageEl, opts = {}) {
       it.style.height = need + 'px'; extra = delta;
     }
   }
-  // the totals block can be taller than its box (VAT / discount / WHT lines): push what's below it down
-  const tb = pageEl.querySelector('.blk-totals');
-  if (tb) {
-    const grow = tb.scrollHeight - tb.clientHeight;
-    if (grow > 2) {
-      const bottom = tb.offsetTop + tb.offsetHeight;
-      pageEl.querySelectorAll('.blk').forEach(b => { if (b !== tb && !b.classList.contains('blk-words') && !b.dataset.follow && b.offsetTop >= bottom - 2) b.style.top = (b.offsetTop + grow) + 'px'; });
-    }
-  }
+  attachToItems(pageEl); pushBelowTotals(pageEl);
   alignWords(pageEl); fitText(pageEl);
   // grow the page if content runs past the bottom (slips grow; A4 continues onto the next sheet)
   let maxBottom = 0;
@@ -305,7 +318,17 @@ function buildPages(container, doc, tpl, opts = {}) {
   const below = tpl.blocks.filter(b => b !== itB && !(b.p && b.p.hidden) && b.y >= itemsBottom - .5);
   const belowSpan = below.length ? Math.max(...below.map(b => b.y + b.h)) - itemsBottom : 0;
   const maxLast = Math.max(itB.h, ph - itB.y - belowSpan - 3) * pxmm;
-  const need = el.firstElementChild.offsetHeight;
+  let need = el.firstElementChild.offsetHeight;
+  if (need > maxLast) {
+    // keep it on ONE page: first put "rooms · nights" on one line, then tighten the table step by step
+    for (const lv of [{ inline: true, scale: 1 }, { inline: true, scale: .92 }, { inline: true, scale: .85 }, { inline: true, scale: .78 }, { inline: true, scale: .72 }, { inline: true, scale: .66 }]) {
+      opts = { ...opts, tableInline: lv.inline, tableScale: lv.scale };
+      container.innerHTML = renderPage(doc, tpl, { ...opts, fillTo: itB.p.minRows ? 0 : undefined });
+      const p2 = container.firstElementChild; applyFlow(p2, { design: true });
+      need = p2.querySelector('.items-blk').firstElementChild.offsetHeight;
+      if (need <= maxLast) { applyFlow(container.firstElementChild); return 1; }
+    }
+  }
   if (need <= maxLast) {
     if (itB.p.minRows) { // add empty ruled rows only as far as the space allows
       const nRows = el.querySelectorAll('tbody tr').length, rowH = 7.5 * pxmm * (tpl.base / 10);
@@ -314,7 +337,7 @@ function buildPages(container, doc, tpl, opts = {}) {
     }
     applyFlow(container.firstElementChild); return 1;
   }
-  const rows = [...el.querySelectorAll('tbody tr')]; const head = el.querySelector('thead'); const headH = head ? head.offsetHeight : 0;
+  const elx = container.querySelector('.items-blk'); const rows = [...elx.querySelectorAll('tbody tr')]; const head = elx.querySelector('thead'); const headH = head ? head.offsetHeight : 0;
   const rh = rows.map(r => r.offsetHeight); const maxFull = (ph - itB.y - 14) * pxmm;
   // fill each page as far as it goes; the last page must also leave room for the footer blocks
   const n0 = rows.length, chunks = []; let i = 0;
