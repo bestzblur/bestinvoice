@@ -447,3 +447,9 @@ input[type=color].inp{padding:3px;height:34px;cursor:pointer}
 .page table.it.book.roomy td{padding-top:2.6mm;padding-bottom:1.4mm}
 .page table.it.book.roomy th{padding-top:1.6mm;padding-bottom:1.6mm}
 .page table.it td:not(.d){white-space:nowrap}
+.num-set .chips{margin-top:8px}
+.num-preview{display:flex;flex-wrap:wrap;gap:8px 18px;align-items:center;background:var(--accent-50);border-radius:10px;padding:10px 12px;margin-top:8px;font-size:12.5px}
+.num-preview span{display:flex;flex-direction:column}
+.num-preview small{color:var(--text-2);font-size:11px}
+.num-preview code{font:600 13.5px ui-monospace,Consolas,monospace;color:var(--accent-700)}
+.num-warn{flex-basis:100%;color:var(--amber);font-size:12px}

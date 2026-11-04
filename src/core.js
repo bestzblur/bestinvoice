@@ -276,15 +276,15 @@ function hotelReceiptBook() {
   return [
     B('company', 12, 8, 82, 30, { size: 9.5, nameSize: 13.5, showEn: false, showAddress: true, showTaxId: true, showContact: true, fit: true, font: 'kanit' }),
     B('logo', 96, 7, 26, 26),
-    B('title', 126, 8, 72, 12, { size: 20, bold: true, align: 'right', copyTag: false, fit: true }),
+    B('title', 126, 8, 72, 12, { size: 18, bold: true, align: 'right', copyTag: false, fit: true }),
     B('docinfo', 142, 22, 56, 11, { size: 10.5, boldLabels: true, showDue: false, showRef: false }),
     B('customer', 12, 40, 122, 21, { size: 10.5, book: true, fit: true }),
     B('extra', 142, 36, 56, 24, { size: 10.5, darkLabels: true, fit: true }),
-    B('items', 12, 62, 186, 51, { size: 10.5, headerBg: 'accent', headerText: '#1D2128', showNo: true, showUnit: false, stayQty: true, bahtCol: true, book: true, nightWord: 'วัน', hideNights: true, autoSize: true }),
-    B('totals', 48, 114, 150, 10, { size: 11, variant: 'box', attach: 'items' }),
-    B('qr', 12, 122, 16, 21, { caption: true }),
-    B('notes', 31, 125, 100, 13, { size: 9 }),
-    B('signature', 142, 124, 56, 16, { size: 11, variant: 'line', count: 1, labels: ['receiver', 'ผู้จัดการ'], useSig: true })
+    B('items', 12, 62, 186, 51, { size: 10.5, headerBg: 'accent', headerText: '#1D2128', showNo: true, showUnit: false, stayQty: true, bahtCol: true, book: true, nightWord: 'วัน', hideNights: true, autoSize: false }),
+    B('totals', 48, 114, 150, 10, { size: 10.5, variant: 'box', attach: 'items' }),
+    B('qr', 12, 117, 21, 26, { caption: true }),
+    B('notes', 37, 126, 98, 13, { size: 9 }),
+    B('signature', 142, 124, 56, 16, { size: 10.5, variant: 'line', count: 1, labels: ['receiver', 'ผู้จัดการ'], useSig: true })
   ];
 }
 const presetName = k => (PRESET_DEFS[k] ? (LANG === 'en' ? PRESET_DEFS[k].en : PRESET_DEFS[k].th) : k);
@@ -348,7 +348,7 @@ function blankState() {
   return {
     version: 1,
     settings: {
-      lang: 'th', theme: 'minimal', showQR: true, a5OnA4: true, vatRate: 7, vatMode: 'exclusive', buddhistYear: true, docLang: 'both', defaultTemplate: tpl.id, printCopy: false,
+      lang: 'th', theme: 'minimal', showQR: true, a5OnA4: true, numFormat: '{PREFIX}{YY}{MM}-{####}', numReset: 'month', numStart: 1, vatRate: 7, vatMode: 'exclusive', buddhistYear: true, docLang: 'both', defaultTemplate: tpl.id, printCopy: false,
       prefixes: { receipt: 'RC', taxreceipt: 'RT', invoice: 'IV', quotation: 'QT' },
       notes: { receipt: '', taxreceipt: '', invoice: 'กรุณาชำระเงินภายในวันที่ครบกำหนด', quotation: 'ใบเสนอราคานี้มีอายุ 30 วัน' },
       company: { nameTh: '', nameEn: '', taxId: '', branch: '', address: '', phone: '', email: '', website: '', logo: '', signature: '' }
@@ -387,6 +387,23 @@ function migrate() {
     }
     save();
   }
+  if (!S.migrations.hotelV7) { // bigger verification QR (easier to scan)
+    S.migrations.hotelV7 = 1;
+    for (const tp of S.templates) if (tp.preset === 'hotel' && tp.style === 'book') for (const b of tp.blocks) {
+      if (b.type === 'qr' && b.w < 21) Object.assign(b, { x: 12, y: 117, w: 21, h: 26 });
+      if (b.type === 'notes' && b.x < 37) Object.assign(b, { x: 37, y: 126, w: 98 });
+    }
+    save();
+  }
+  if (!S.migrations.hotelV6) { // one consistent text size (same as No./Date), no table up-scaling
+    S.migrations.hotelV6 = 1;
+    for (const tp of S.templates) if (tp.preset === 'hotel' && tp.style === 'book') for (const b of tp.blocks) {
+      if (b.type === 'items') b.p.autoSize = false;
+      if (b.type === 'totals' || b.type === 'signature') b.p.size = 10.5;
+      if (b.type === 'title' && b.p.size > 18) b.p.size = 18;
+    }
+    save();
+  }
   if (!S.migrations.hotelV5) { // larger, readable print sizes + auto-sizing table
     S.migrations.hotelV5 = 1;
     for (const tp of S.templates) if (tp.preset === 'hotel' && tp.style === 'book') {
@@ -422,14 +439,44 @@ function save() {
 }
 
 /* ---------- numbering ---------- */
-function nextNumber(type, iso) {
-  const pre = (S.settings.prefixes[type] || 'DOC');
-  const [y, m] = (iso || todayISO()).split('-');
-  const yy = S.settings.buddhistYear ? String(+y + 543).slice(-2) : y.slice(-2);
-  const head = `${pre}${yy}${m}-`;
+/* Document numbering — user-defined pattern.
+   Tokens: {PREFIX} {YYYY} {YY} {MM} {DD} and {###…} = running number (one # per digit).
+   Reset: 'month' | 'year' | 'never'. Start: first running number. */
+const NUM_PRESETS = [
+  ['{PREFIX}{YY}{MM}-{####}', 'RC6911-0001'], ['{PREFIX}-{YYYY}-{####}', 'RC-2569-0001'], ['{PREFIX}{YYYY}{MM}{####}', 'RC2569110001'],
+  ['{PREFIX}/{YYYY}/{####}', 'RC/2569/0001'], ['{#####}', '01083'], ['{PREFIX}{#####}', 'RC01083']
+];
+function numParts(iso) {
+  const [y, m, d] = (iso || todayISO()).split('-'); const Y = S.settings.buddhistYear ? String(+y + 543) : y;
+  return { YYYY: Y, YY: Y.slice(-2), MM: m, DD: d };
+}
+function formatNumber(type, iso, seq, fmt) {
+  fmt = fmt || S.settings.numFormat || '{PREFIX}{YY}{MM}-{####}'; const P = numParts(iso), pre = S.settings.prefixes[type] || '';
+  if (!/\{#+\}/.test(fmt)) fmt += '{####}';
+  return fmt.replace(/\{PREFIX\}/g, pre).replace(/\{YYYY\}/g, P.YYYY).replace(/\{YY\}/g, P.YY).replace(/\{MM\}/g, P.MM).replace(/\{DD\}/g, P.DD)
+            .replace(/\{(#+)\}/g, (m0, h) => String(seq).padStart(h.length, '0'));
+}
+function nextNumber(type, iso, opts = {}) {
+  let fmt = opts.fmt || S.settings.numFormat || '{PREFIX}{YY}{MM}-{####}'; if (!/\{#+\}/.test(fmt)) fmt += '{####}';
+  const reset = opts.reset || S.settings.numReset || 'month', start = Math.max(1, parseInt(opts.start ?? S.settings.numStart) || 1);
+  const P = numParts(iso), pre = S.settings.prefixes[type] || '';
+  const rx = s => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  // build a pattern that matches numbers of this type within the current reset period
+  let re = '', i = 0;
+  for (const part of fmt.split(/(\{[A-Z]+\}|\{#+\})/)) {
+    if (!part) continue;
+    if (part === '{PREFIX}') re += rx(pre);
+    else if (part === '{YYYY}') re += reset === 'never' ? '\\d{4}' : P.YYYY;
+    else if (part === '{YY}') re += reset === 'never' ? '\\d{2}' : P.YY;
+    else if (part === '{MM}') re += reset === 'month' ? P.MM : '\\d{2}';
+    else if (part === '{DD}') re += '\\d{2}';
+    else if (/^\{#+\}$/.test(part)) { re += '(\\d+)'; i++; }
+    else re += rx(part);
+  }
+  const R = new RegExp('^' + re + '$');
   let max = 0;
-  for (const d of S.documents) if (d.number && d.number.startsWith(head)) max = Math.max(max, parseInt(d.number.slice(head.length)) || 0);
-  return head + String(max + 1).padStart(4, '0');
+  for (const d of S.documents) { const m = d.number && R.exec(d.number); if (m) max = Math.max(max, parseInt(m[1]) || 0); }
+  return formatNumber(type, iso, Math.max(max + 1, start), fmt);
 }
 
 /* ---------- sample data ---------- */

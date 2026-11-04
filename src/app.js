@@ -495,7 +495,15 @@ function viewSettings(c) {
         <label class="field"><span>${t('defaultVat')}</span><select class="inp" data-s="vatMode">${sel([['exclusive', t('vatEx')], ['inclusive', t('vatIn')], ['none', t('vatNone')]], s.vatMode)}</select></label>
         <label class="field"><span>${t('docLang')}</span><select class="inp" data-s="docLang">${sel([['th', t('langTh')], ['en', t('langEn')], ['both', t('langBoth')]], s.docLang)}</select></label></div>
       <div style="display:flex;gap:24px;flex-wrap:wrap"><label class="switch"><input type="checkbox" data-s="buddhistYear" ${s.buddhistYear ? 'checked' : ''}><i></i>${t('buddhistYear')}</label><label class="switch"><input type="checkbox" data-s="showQR" ${s.showQR !== false ? 'checked' : ''}><i></i>${t('showQR')}</label><label class="switch"><input type="checkbox" data-s="printCopy" ${s.printCopy ? 'checked' : ''}><i></i>${t('showCopyTag')}</label><label class="switch"><input type="checkbox" data-s="a5OnA4" ${s.a5OnA4 !== false ? 'checked' : ''}><i></i>${t('a5OnA4')}</label></div>
-      <div class="field"><span>${t('numbering')}</span><div class="grid g4">${['receipt', 'taxreceipt', 'invoice', 'quotation'].map(ty => `<label class="field"><small>${t(ty)}</small><input class="inp" data-s="prefixes.${ty}" value="${esc(s.prefixes[ty])}"></label>`).join('')}</div><small id="num-hint">${t('numberingHint', { x: nextNumber('receipt') })}</small></div>
+      <div class="field num-set"><span>${t('numbering')}</span>
+        <div class="grid g2"><label class="field"><small>${t('numFormat')}</small><input class="inp" id="num-fmt" data-s="numFormat" value="${esc(s.numFormat || '{PREFIX}{YY}{MM}-{####}')}" spellcheck="false"></label>
+          <label class="field"><small>${t('numPreset')}</small><select class="inp" id="num-preset">${sel([['', '—'], ...NUM_PRESETS.map(([f, ex]) => [f, ex])], NUM_PRESETS.some(p => p[0] === s.numFormat) ? s.numFormat : '')}</select></label></div>
+        <div class="chips">${[['{PREFIX}', 'tkPrefix'], ['{YYYY}', 'tkYYYY'], ['{YY}', 'tkYY'], ['{MM}', 'tkMM'], ['{DD}', 'tkDD'], ['{####}', 'tkSeq4'], ['{#####}', 'tkSeq5'], ['-', 'tkDash'], ['/', 'tkSlash']].map(([tk, k]) => `<button class="chip" data-numtk="${tk}" title="${esc(tk)}">${esc(t(k))}</button>`).join('')}</div>
+        <div class="grid g3" style="margin-top:6px"><label class="field"><small>${t('numReset')}</small><select class="inp" data-s="numReset">${sel([['month', t('rsMonth')], ['year', t('rsYear')], ['never', t('rsNever')]], s.numReset || 'month')}</select></label>
+          <label class="field"><small>${t('numStart')}</small><input class="inp num" data-s="numStart" data-num value="${s.numStart || 1}" inputmode="numeric"></label></div>
+        <small style="margin-top:6px">${t('prefix')}</small>
+        <div class="grid g4">${['receipt', 'taxreceipt', 'invoice', 'quotation'].map(ty => `<label class="field"><small>${t(ty)}</small><input class="inp" data-s="prefixes.${ty}" value="${esc(s.prefixes[ty])}"></label>`).join('')}</div>
+        <div class="num-preview" id="num-hint">${numPreview()}</div></div>
       <div class="grid g2">${['receipt', 'taxreceipt', 'invoice', 'quotation'].map(ty => `<label class="field"><span>${t('defaultNotes')} — ${t(ty)}</span><textarea class="inp" rows="2" data-s="notes.${ty}">${esc(s.notes[ty])}</textarea></label>`).join('')}</div>
     </div></div>
     <div class="card"><div class="card-h"><h3>${ico('gear')} ${t('appSettings')}</h3></div><div class="card-b grid">
@@ -503,7 +511,7 @@ function viewSettings(c) {
       <label class="field" style="max-width:320px"><span>${t('uiFont')}</span><select class="inp" data-uifont>${sel(Object.keys(FONTS).map(k => [k, FONT_LABELS[k]]), S.settings.uiFont || 'plex')}</select></label>
       <div class="field"><span>${t('uiLang')}</span><div class="seg" style="align-self:flex-start"><button data-act="lang" data-v="th" class="${LANG === 'th' ? 'on' : ''}">ไทย</button><button data-act="lang" data-v="en" class="${LANG === 'en' ? 'on' : ''}">English</button></div></div>
       <div class="field"><span>${t('backup')}</span><small>${t('backupHint')}</small><div style="display:flex;gap:10px;flex-wrap:wrap;margin-top:6px"><button class="btn" data-act="export">${ico('download', 16)}${t('exportBackup')}</button><button class="btn" data-act="import">${ico('upload', 16)}${t('importBackup')}</button><button class="btn" data-act="sample">${ico('sparkle', 16)}${t('loadSample')}</button>${window.bestinvoiceNative ? `<button class="btn" data-act="openbackups">${ico('layers', 16)}${LANG === 'th' ? 'เปิดโฟลเดอร์สำรองอัตโนมัติ' : 'Open auto-backup folder'}</button>` : ''}<button class="btn danger" data-act="reset">${ico('trash', 16)}${t('resetAll')}</button></div></div>
-      <div class="hint">Bestinvoice 1.9 · macOS · Windows · ${LANG === 'th' ? 'ใช้งานได้แบบออฟไลน์' : 'Works offline'}</div>
+      <div class="hint">Bestinvoice 1.10 · macOS · Windows · ${LANG === 'th' ? 'ใช้งานได้แบบออฟไลน์' : 'Works offline'}</div>
     </div></div>
   </div>`;
   $$('[data-grow]', c).forEach(autoGrow);
@@ -534,6 +542,7 @@ const ACT = {
   ednewprod: () => editProduct(null, p => { addProductToDoc(p); }),
   edstep: el => { const inp = $(`[data-ex="${el.dataset.k}"]`); inp.value = Math.max(1, (parseInt(inp.value) || 1) + +el.dataset.v); inp.dispatchEvent(new Event('input', { bubbles: true })); },
   theme: el => setTheme(el.dataset.v),
+  numtk: el => {},
   themepick: el => dropdown(el, THEMES.map(k => ({ label: (S.settings.theme === k ? '✓ ' : '') + t('th_' + k), icon: 'sparkle', run: () => setTheme(k) }))),
   edsavecust: () => { const d = UI.ed.doc; if (!d.customer.name.trim()) return; const c = { id: uid(), name: d.customer.name.trim(), taxId: d.customer.taxId, branch: d.customer.branch, address: d.customer.address, phone: d.customer.phone, email: '', contact: '' }; S.customers.push(c); d.customerId = c.id; touchDoc(); toast(t('saved')); renderShell(); },
   edprint: el => { touchDoc(); printNow(UI.ed.doc, el.dataset.copy === '1'); },
@@ -554,6 +563,8 @@ const ACT = {
 function loadAfterReplace() { ensureSecret(); try { localStorage.setItem(STORE_KEY, JSON.stringify(S)); } catch (e) {} loadState(); UI.ed = null; go('dashboard'); }
 
 document.addEventListener('click', e => {
+  const tk = e.target.closest('[data-numtk]');
+  if (tk) { const f = $('#num-fmt'); const p = f.selectionStart ?? f.value.length; f.value = f.value.slice(0, p) + tk.dataset.numtk + f.value.slice(f.selectionEnd ?? p); f.focus(); f.selectionStart = f.selectionEnd = p + tk.dataset.numtk.length; f.dispatchEvent(new Event('input', { bubbles: true })); return; }
   const el = e.target.closest('[data-act]'); if (!el) return;
   if (el.tagName === 'TR' && e.target.closest('button,input,select,textarea,a')) return;
   const fn = ACT[el.dataset.act] || (window.DACT && DACT[el.dataset.act]);
@@ -563,6 +574,7 @@ document.addEventListener('change', e => {
   const el = e.target;
   if (el.dataset.uichange) { UI[el.dataset.uichange] = el.value; UI.page = 1; renderView(); return; }
   if (el.dataset.k === 'perNight' && UI.ed) { const d = UI.ed.doc, it = d.items[+el.dataset.it]; it.perNight = el.checked; if (!el.checked) delete it.nights; syncStay(d, templateFor(d)); touchDoc(); const st = $('#content').scrollTop; renderView(); $('#content').scrollTop = st; return; }
+  if (el.id === 'num-preset' && el.value) { const f = $('#num-fmt'); f.value = el.value; f.dispatchEvent(new Event('input', { bubbles: true })); return; }
   if (el.dataset.uifont !== undefined) { S.settings.uiFont = el.value; applyUiFont(); save(); return; }
   if (el.dataset.docqr !== undefined && UI.ed) { UI.ed.doc.showQR = el.checked; touchDoc(); renderPreview(true); toast(t(el.checked ? 'qrOnMsg' : 'qrOffMsg')); return; }
   if (el.dataset.dsqr !== undefined) { S.settings.showQR = el.checked; save(); if (window.dCanvas) dCanvas(); toast(t(el.checked ? 'qrOnMsg' : 'qrOffMsg')); return; }
@@ -621,7 +633,7 @@ document.addEventListener('input', e => {
   } else if (el.dataset.s !== undefined && el.type !== 'checkbox') {
     setPath(S.settings, el.dataset.s, el.dataset.num !== undefined ? num(el.value) : el.value); save();
     if (el.dataset.s.startsWith('company.name') || el.dataset.s === 'company.branch') { const nm = $('.co-card .nm'); if (nm) nm.textContent = S.settings.company.nameTh || S.settings.company.nameEn; }
-    if (el.dataset.s.startsWith('prefixes.')) { const h = $('#num-hint'); if (h) h.textContent = t('numberingHint', { x: nextNumber('receipt') }); }
+    if (/^(prefixes\.|num)/.test(el.dataset.s)) { const h = $('#num-hint'); if (h) h.innerHTML = numPreview(); if (el.dataset.s === 'numFormat') { const ps = $('#num-preset'); if (ps) ps.value = NUM_PRESETS.some(p => p[0] === el.value) ? el.value : ''; } }
   }
 });
 window.addEventListener('resize', () => { if (UI.view === 'editor') renderPreview(); if (UI.view === 'designer' && window.dFit) dFit(); });
@@ -629,6 +641,10 @@ window.addEventListener('keydown', e => { if ((e.ctrlKey || e.metaKey) && e.key.
 
 /* ---------- themes ---------- */
 const THEMES = ['minimal', 'pastel', 'modern', 'classic', 'glass'];
+function numPreview() {
+  const fmt = S.settings.numFormat || ''; const warn = /\{#+\}/.test(fmt) ? '' : `<div class="num-warn">${t('numNoSeq')}</div>`;
+  return `<b>${t('numNext')}</b>` + ['receipt', 'taxreceipt', 'invoice', 'quotation'].map(ty => `<span><small>${t(ty)}</small><code>${esc(nextNumber(ty))}</code></span>`).join('') + warn;
+}
 function applyUiFont() { const k = S.settings.uiFont || 'plex'; document.documentElement.style.setProperty('--font', `${FONTS[k] || FONTS.plex},'Plex Thai','Leelawadee UI','Thonburi',system-ui,sans-serif`); }
 function setTheme(k) { S.settings.theme = k; document.documentElement.dataset.theme = k; save(); if (UI.view === 'settings') renderView(); }
 
