@@ -127,7 +127,7 @@ function renderBlock(b, ctx) {
       if (p.bahtCol) cols.push(['baht', 'c', '10mm']);
       const M = ctx.M, nw = p.nightWord || (lang === 'en' ? 'nights' : 'คืน');
       const thLab = k => k === 'baht' ? '' : (p.stayQty && k === 'price' ? (lang === 'en' ? 'Unit price' : lang === 'th' ? 'หน่วยละ' : 'หน่วยละ<small>Unit price</small>') : p.stayQty && k === 'amount' ? (lang === 'en' ? 'Amount' : lang === 'th' ? 'รวมเป็นเงิน' : 'รวมเป็นเงิน<small>Amount</small>') : L2(k, lang));
-      let h = `<table class="it${p.book ? ' book' : ''}" style="${p.book ? `border-bottom:.6mm solid ${hb}` : ''}"><thead><tr style="background:${hb};color:${ht}">` + cols.map(c => `<th class="${p.book && c[0] !== 'amount' ? 'c' : c[1]}" style="${c[2] ? 'width:' + c[2] + ';' : ''}${bd}">${thLab(c[0])}</th>`).join('') + `</tr></thead><tbody>`;
+      let h = `<table class="it${p.book ? ' book' : ''}" style="${p.book ? `border-bottom:.6mm solid ${hb}` : ''}"><thead><tr style="${p.book ? '' : `background:${hb};`}color:${ht}">` + cols.map(c => `<th class="${p.book && c[0] !== 'amount' ? 'c' : c[1]}" style="${c[2] ? 'width:' + c[2] + ';' : ''}${bd}${p.book ? `background:${hb};` : ''}">${thLab(c[0])}</th>`).join('') + `</tr></thead><tbody>`;
       const rows = items.map((it, i) => {
         const q = money(it.qty, num(it.qty) % 1 ? 2 : 0);
         const qtyCell = p.stayQty ? `${q}${it.unit ? ' ' + esc(it.unit) : ''}${it.nights !== undefined && it.nights !== '' ? `<div style="margin-top:1.2mm">${money(it.nights, 0)} ${esc(nw)}</div>` : ''}` : q;
@@ -144,10 +144,10 @@ function renderBlock(b, ctx) {
         if (doc.vatMode !== 'none') { if (pre.length || doc.vatMode === 'exclusive') pre.unshift([L('subtotal', lang), calc.subtotal]); if (doc.vatMode === 'inclusive') pre.push([L('beforeVat', lang), calc.beforeVat]); pre.push([`${L('vat', lang)} ${calc.rate}%`, calc.vat]); }
         else if (pre.length) pre.unshift([L('subtotal', lang), calc.subtotal]);
         const words = lang === 'en' ? englishText(calc.total) : bahtText(calc.total);
-        let h = `<div style="display:flex;flex-direction:column;justify-content:flex-end;height:100%">`;
-        if (pre.length) h += `<div class="tt" style="margin-left:auto;width:62%;margin-bottom:1.2mm">${pre.map(r => `<span class="k">${esc(r[0])}</span><span class="r">${M(r[1])}</span>`).join('')}</div>`;
+        let h = `<div style="display:flex;flex-direction:column">`;
+        if (pre.length) h += `<div class="tt" style="margin-left:auto;width:62%;margin-bottom:1mm;font-size:.92em;gap:.4mm 4mm">${pre.map(r => `<span class="k">${esc(r[0])}</span><span class="r">${M(r[1])}</span>`).join('')}</div>`;
         h += `<div class="sumbox"><b>${lang === 'en' ? 'Amount' : 'จำนวนเงิน'}</b><b class="sw">${esc(words)}</b><b>${lang === 'en' ? 'Total' : 'รวมเงิน'}</b><b class="sv">${M(calc.total)}</b><b>${lang === 'en' ? 'THB' : 'บาท'}</b></div>`;
-        if (calc.wht) h += `<div class="tt" style="margin-left:auto;width:62%;margin-top:1.2mm"><span class="k">${esc(L('wht', lang))} ${num(doc.whtRate)}%</span><span class="r">${M(-calc.wht)}</span><b>${esc(L('net', lang))}</b><b class="r">${M(calc.net)}</b></div>`;
+        if (calc.wht) h += `<div style="display:flex;justify-content:flex-end;gap:5mm;margin-top:1mm;font-size:.92em"><span><span class="k">${esc(L('wht', lang))} ${num(doc.whtRate)}%</span> ${M(-calc.wht)}</span><b>${esc(L('net', lang))} ${M(calc.net)}</b></div>`;
         return h + '</div>';
       }
       const rows = [[L('subtotal', lang), calc.subtotal]];
@@ -273,6 +273,15 @@ function applyFlow(pageEl, opts = {}) {
       it.style.height = need + 'px'; extra = delta;
     }
   }
+  // the totals block can be taller than its box (VAT / discount / WHT lines): push what's below it down
+  const tb = pageEl.querySelector('.blk-totals');
+  if (tb) {
+    const grow = tb.scrollHeight - tb.clientHeight;
+    if (grow > 2) {
+      const bottom = tb.offsetTop + tb.offsetHeight;
+      pageEl.querySelectorAll('.blk').forEach(b => { if (b !== tb && !b.classList.contains('blk-words') && !b.dataset.follow && b.offsetTop >= bottom - 2) b.style.top = (b.offsetTop + grow) + 'px'; });
+    }
+  }
   alignWords(pageEl); fitText(pageEl);
   // grow the page if content runs past the bottom (slips grow; A4 continues onto the next sheet)
   let maxBottom = 0;
@@ -344,6 +353,7 @@ function printDoc(doc, withCopy) {
 }
 async function printNow(doc, withCopy) {
   await FONTS_READY;
+  if (window.bestinvoiceNative && window.bestinvoiceNative.print) return openPrintDialog(doc, withCopy);
   printDoc(doc, withCopy);
   const title = document.title; document.title = `${doc.number} ${doc.customer.name || ''}`.trim();
   setTimeout(() => { window.print(); document.title = title; }, 60);

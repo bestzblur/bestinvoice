@@ -386,6 +386,43 @@ function convertDoc(d, type) {
   if (!UI.ed.stored) touchDoc();
   S.documents.push(n); save(); toast(t('convertDone')); openDoc(n.id);
 }
+/* Desktop app: our own print dialog (Windows' dialog can't preview Electron pages and ignores the paper orientation) */
+const PRINT_SIZES = { A4: ['A4', false], A4L: ['A4', true], A5: ['A5', false], A5L: ['A5', true] };
+async function openPrintDialog(doc, withCopy) {
+  const tpl = templateFor(doc);
+  const { pw, ph } = printDoc(doc, withCopy);
+  const pages = $('#print-root').innerHTML;
+  let printers = []; try { printers = await window.bestinvoiceNative.getPrinters() || []; } catch (e) {}
+  const def = (printers.find(p => p.name === S.settings.printer) || printers.find(p => p.isDefault) || printers[0] || {}).name || '';
+  const nPages = $$('#print-root .page').length;
+  const paperName = paperLabel(tpl.paper);
+  modal({ title: t('printTitle'), wide: true, saveLabel: t('print'),
+    body: `<div class="pd"><div class="pd-prev"><div class="pd-scale" id="pd-scale">${pages}</div></div>
+      <div class="pd-opt">
+        <label class="field"><span>${t('printer')}</span>${printers.length ? `<select class="inp" id="pd-printer">${sel(printers.map(p => [p.name, (p.displayName || p.name) + (p.isDefault ? ' ★' : '')]), def)}</select>` : `<div class="hint">${t('noPrinter')}</div>`}</label>
+        <div class="grid g2"><label class="field"><span>${t('copies')}</span><input class="inp num" id="pd-copies" type="number" min="1" max="99" value="1"></label>
+          <label class="field"><span>${t('colorMode')}</span><select class="inp" id="pd-color">${sel([['1', t('colorOn')], ['0', t('colorOff')]], S.settings.printColor === false ? '0' : '1')}</select></label></div>
+        <div class="pd-paper">${ico('file', 16)}<div><b>${esc(paperName)}</b><small>${t('paperAuto')}</small></div></div>
+        <div class="hint">${t('paperHint', { p: esc(paperName.replace(/ \(.*\)/, '')) })} · ${nPages} ${LANG === 'en' ? 'page(s)' : 'หน้า'}</div>
+        <div style="display:flex;gap:8px;flex-wrap:wrap"><button class="btn sm" id="pd-pdf">${ico('pdf', 15)}${t('savePdf')}</button><button class="btn sm ghost" id="pd-sys">${t('systemDialog')}</button></div>
+      </div></div>`,
+    onOpen: ov => {
+      const sc = $('#pd-scale', ov), box = sc.parentElement, pg = sc.querySelector('.page');
+      const k = Math.min(1, (box.clientWidth - 24) / pg.offsetWidth); sc.style.transform = `scale(${k})`; sc.style.width = pg.offsetWidth + 'px';
+      box.style.height = Math.min(560, sc.scrollHeight * k + 24) + 'px';
+      $('#pd-pdf', ov).onclick = () => { ov.remove(); savePdf(doc); };
+      $('#pd-sys', ov).onclick = async () => { ov.remove(); printDoc(doc, withCopy); const ps = PRINT_SIZES[tpl.paper]; await window.bestinvoiceNative.print({ dialog: true, landscape: ps ? ps[1] : false, pageSize: ps ? ps[0] : { width: Math.round(pw * 1000), height: Math.round(ph * 1000) } }); };
+    },
+    onSave: ov => {
+      const ps = PRINT_SIZES[tpl.paper];
+      const opts = { deviceName: $('#pd-printer', ov) ? $('#pd-printer', ov).value : '', copies: Math.max(1, parseInt($('#pd-copies', ov).value) || 1), color: $('#pd-color', ov).value === '1',
+        landscape: ps ? ps[1] : false, pageSize: ps ? ps[0] : { width: Math.round(pw * 1000), height: Math.round(ph * 1000) } };
+      S.settings.printer = opts.deviceName; S.settings.printColor = opts.color; save();
+      toast(t('printing'));
+      printDoc(doc, withCopy);
+      window.bestinvoiceNative.print(opts).then(r => toast(r && r.ok ? t('printed') : t('printFail') + (r && r.reason ? ' (' + r.reason + ')' : ''))).catch(() => toast(t('printFail')));
+    } });
+}
 async function savePdf(d) {
   if (window.bestinvoiceNative && window.bestinvoiceNative.savePDF) {
     await FONTS_READY;
@@ -462,7 +499,7 @@ function viewSettings(c) {
       <label class="field" style="max-width:320px"><span>${t('uiFont')}</span><select class="inp" data-uifont>${sel(Object.keys(FONTS).map(k => [k, FONT_LABELS[k]]), S.settings.uiFont || 'plex')}</select></label>
       <div class="field"><span>${t('uiLang')}</span><div class="seg" style="align-self:flex-start"><button data-act="lang" data-v="th" class="${LANG === 'th' ? 'on' : ''}">ไทย</button><button data-act="lang" data-v="en" class="${LANG === 'en' ? 'on' : ''}">English</button></div></div>
       <div class="field"><span>${t('backup')}</span><small>${t('backupHint')}</small><div style="display:flex;gap:10px;flex-wrap:wrap;margin-top:6px"><button class="btn" data-act="export">${ico('download', 16)}${t('exportBackup')}</button><button class="btn" data-act="import">${ico('upload', 16)}${t('importBackup')}</button><button class="btn" data-act="sample">${ico('sparkle', 16)}${t('loadSample')}</button>${window.bestinvoiceNative ? `<button class="btn" data-act="openbackups">${ico('layers', 16)}${LANG === 'th' ? 'เปิดโฟลเดอร์สำรองอัตโนมัติ' : 'Open auto-backup folder'}</button>` : ''}<button class="btn danger" data-act="reset">${ico('trash', 16)}${t('resetAll')}</button></div></div>
-      <div class="hint">Bestinvoice 1.5 · macOS · Windows · ${LANG === 'th' ? 'ใช้งานได้แบบออฟไลน์' : 'Works offline'}</div>
+      <div class="hint">Bestinvoice 1.6 · macOS · Windows · ${LANG === 'th' ? 'ใช้งานได้แบบออฟไลน์' : 'Works offline'}</div>
     </div></div>
   </div>`;
   $$('[data-grow]', c).forEach(autoGrow);

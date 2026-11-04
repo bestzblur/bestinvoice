@@ -253,7 +253,7 @@ const PRESET_DEFS = {
   a5:         { th: 'ครึ่ง A4 (A5)', en: 'Half A4 (A5)', style: 'minimal', paper: 'A5', accent: '#13A387', font: 'plex' },
   slip:       { th: 'สลิป 80 มม.', en: '80 mm slip', style: 'minimal', paper: '80mm', accent: '#111111', font: 'plex', thanks: 'ขอบคุณที่ใช้บริการ\nThank you!', items: { headerBg: 'transparent', headerText: '#111111' }, noSig: true },
   // business templates
-  hotel:      { biz: 1, icon: '🏨', th: 'โรงแรม / ที่พัก (A5 แนวนอน)', en: 'Hotel / Guesthouse (A5 landscape)', paper: 'A5L', accent: '#A8C7F5', font: 'noto', build: hotelReceiptBook, docLang: 'th', dateStyle: 'long', intMoney: true,
+  hotel:      { biz: 1, icon: '🏨', th: 'โรงแรม / ที่พัก (A5 แนวนอน)', en: 'Hotel / Guesthouse (A5 landscape)', paper: 'A5L', accent: '#A8C7F5', font: 'noto', build: hotelReceiptBook, docLang: 'th', dateStyle: 'long', intMoney: false,
                 extra: [Object.assign(F('room', 'ห้อง', 'Room'), {}), F('checkin', 'เข้าพักวันที่', 'Check-in', 'checkin'), F('checkout', 'ออกวันที่', 'Check-out', 'checkout'), Object.assign(F('nights', 'จำนวนคืน', 'Nights', 'nights'), { hidePrint: true }), Object.assign(F('rooms', 'จำนวนห้อง', 'Rooms', 'rooms'), { hidePrint: true })] },
   hotelModern: { biz: 1, icon: '🏨', th: 'โรงแรม / รีสอร์ท (A4 โมเดิร์น)', en: 'Hotel / Resort (A4 modern)', style: 'band', paper: 'A4', accent: '#A47E3B', font: 'plex', sig: ['customerSign', 'receiver'],
                 extra: [F('checkin', 'วันเช็คอิน', 'Check-in', 'checkin'), F('checkout', 'วันเช็คเอาท์', 'Check-out', 'checkout'), F('nights', 'จำนวนคืน', 'Nights', 'nights'), F('rooms', 'จำนวนห้อง', 'Rooms', 'rooms'), F('room', 'เลขห้อง', 'Room no.')],
@@ -282,9 +282,9 @@ function hotelReceiptBook() {
     B('extra', 142, 62, 50, 22, { size: 9, darkLabels: true, fit: true }),
     B('items', 22, 87, 168, 15, { size: 9, headerBg: 'accent', headerText: '#1D2128', showNo: true, showUnit: false, stayQty: true, bahtCol: true, book: true, nightWord: 'วัน' }),
     B('totals', 62, 104, 128, 10, { size: 9.5, variant: 'box' }),
-    B('qr', 22, 118, 15, 19, { caption: true }),
-    B('notes', 40, 120, 92, 14, { size: 8 }),
-    B('signature', 140, 121, 50, 16, { size: 9.5, variant: 'line', count: 1, labels: ['receiver', 'ผู้จัดการ'], useSig: true })
+    B('qr', 22, 116, 15, 19, { caption: true }),
+    B('notes', 40, 118, 92, 12, { size: 8 }),
+    B('signature', 140, 118, 50, 15, { size: 9.5, variant: 'line', count: 1, labels: ['receiver', 'ผู้จัดการ'], useSig: true })
   ];
 }
 const presetName = k => (PRESET_DEFS[k] ? (LANG === 'en' ? PRESET_DEFS[k].en : PRESET_DEFS[k].th) : k);
@@ -366,6 +366,24 @@ function loadState() {
   for (const k of ['customers', 'products', 'documents', 'templates']) S[k] = S[k] || [];
   if (!S.templates.length) S.templates.push(makeTemplate('minimal'));
   LANG = S.settings.lang || 'th';
+  migrate();
+}
+function migrate() {
+  S.migrations = S.migrations || {};
+  if (!S.migrations.hotelA5) {
+    S.migrations.hotelA5 = 1;
+    for (const tp of [...S.templates]) if (tp.preset === 'hotel' && tp.style !== 'book') {
+      const old = clone(tp); old.id = uid(); old.preset = 'hotelModern'; old.name = tp.name + (LANG === 'en' ? ' (old A4)' : ' (A4 เดิม)'); old.blocks.forEach(b => b.id = uid());
+      S.templates.push(old);
+      const n = makeTemplate('hotel'); Object.assign(tp, n, { id: tp.id });
+    }
+    save();
+  }
+  if (!S.migrations.hotelDecimals) { // receipts show satang (.00) — turn off whole-number amounts on hotel templates
+    S.migrations.hotelDecimals = 1;
+    for (const tp of S.templates) if (tp.preset === 'hotel') tp.intMoney = false;
+    save();
+  }
 }
 let saveTimer = null;
 function save() {
