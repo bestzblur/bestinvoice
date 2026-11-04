@@ -453,3 +453,11 @@ input[type=color].inp{padding:3px;height:34px;cursor:pointer}
 .num-preview small{color:var(--text-2);font-size:11px}
 .num-preview code{font:600 13.5px ui-monospace,Consolas,monospace;color:var(--accent-700)}
 .num-warn{flex-basis:100%;color:var(--amber);font-size:12px}
+
+/* crisp printing: default text colours become pure black so the printer uses black ink only */
+#print-root.crisp .page{color:#000}
+#print-root.crisp .page .k,#print-root.crisp .page .tt .k{color:#000!important}
+@media print{#print-root .page{-webkit-print-color-adjust:exact;print-color-adjust:exact;text-rendering:geometricPrecision}}
+.pd-tips{font-size:12.5px;color:var(--text-2);background:var(--surface-2);border-radius:10px;padding:8px 12px}
+.pd-tips summary{cursor:pointer;font-weight:600;color:var(--accent-700);display:flex;align-items:center;gap:6px}
+.pd-tips ul{margin:8px 0 2px;padding-left:18px;line-height:1.6}

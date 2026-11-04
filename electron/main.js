@@ -51,7 +51,7 @@ ipcMain.on('auto-backup', (_e, json) => {
 // Printing: list printers and print silently with the template's paper size (our own dialog shows the preview)
 ipcMain.handle('get-printers', async () => { try { return await win.webContents.getPrintersAsync(); } catch (e) { return []; } });
 ipcMain.handle('print', (_e, o = {}) => new Promise(resolve => {
-  const opts = { silent: !o.dialog, printBackground: true, margins: { marginType: 'none' }, landscape: !!o.landscape, color: o.color !== false, copies: o.copies || 1 };
+  const opts = { silent: !o.dialog, printBackground: true, margins: { marginType: 'none' }, landscape: !!o.landscape, color: o.color !== false, copies: o.copies || 1, dpi: { horizontal: 600, vertical: 600 } };
   if (o.deviceName) opts.deviceName = o.deviceName;
   if (o.pageSize) opts.pageSize = o.pageSize;
   win.webContents.print(opts, (ok, reason) => resolve({ ok, reason }));

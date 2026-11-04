@@ -388,6 +388,7 @@ function wrapSheets(html, sheet) {
 function printDoc(doc, withCopy) {
   const tpl = templateFor(doc);
   const root = $('#print-root');
+  root.classList.toggle('crisp', S.settings.crispText !== false);
   const copies = withCopy ? ['original', 'copy'] : [S.settings.printCopy ? 'original' : null];
   root.style.cssText = 'display:block;position:absolute;left:-10000px;top:0';
   let html = '';

@@ -406,12 +406,15 @@ async function openPrintDialog(doc, withCopy) {
         <div class="grid g2"><label class="field"><span>${t('copies')}</span><input class="inp num" id="pd-copies" type="number" min="1" max="99" value="1"></label>
           <label class="field"><span>${t('colorMode')}</span><select class="inp" id="pd-color">${sel([['1', t('colorOn')], ['0', t('colorOff')]], S.settings.printColor === false ? '0' : '1')}</select></label></div>
         <div class="pd-paper">${ico('file', 16)}<div><b>${esc(paperName)}</b><small>${t('paperAuto')}</small></div></div>
+        <label class="switch" style="font-size:13px"><input type="checkbox" id="pd-crisp" ${S.settings.crispText !== false ? 'checked' : ''}><i></i>${t('crispText')}</label>
+        <details class="pd-tips"><summary>${ico('sparkle', 14)} ${t('sharpTitle')}</summary><ul>${t('sharpTips')}</ul></details>
         ${canHalf ? `<label class="switch" style="font-size:13px"><input type="checkbox" id="pd-half" ${sheet ? 'checked' : ''}><i></i>${t('a5OnA4')}</label>` : ''}
         <div class="hint">${t('paperHint', { p: sheet ? 'A4' : esc(paperName.replace(/ \(.*\)/, '')) })} · ${nPages} ${LANG === 'en' ? 'sheet(s)' : 'แผ่น'}${sheet && withCopy ? ' · ' + t('copyBottom') : ''}</div>
         <div style="display:flex;gap:8px;flex-wrap:wrap"><button class="btn sm" id="pd-pdf">${ico('pdf', 15)}${t('savePdf')}</button><button class="btn sm ghost" id="pd-sys">${t('systemDialog')}</button></div>
       </div></div>`,
     onOpen: ov => {
       const sc = $('#pd-scale', ov), box = sc.parentElement, pg = sc.firstElementChild;
+      const cr = $('#pd-crisp', ov); if (cr) cr.onchange = () => { S.settings.crispText = cr.checked; save(); printDoc(doc, withCopy); };
       const half = $('#pd-half', ov); if (half) half.onchange = () => { S.settings.a5OnA4 = half.checked; save(); ov.remove(); openPrintDialog(doc, withCopy); if (UI.view === 'editor') renderPreview(true); };
       const k = Math.min(1, (box.clientWidth - 24) / pg.offsetWidth, 536 / pg.offsetHeight); sc.style.transform = `scale(${k})`; sc.style.width = pg.offsetWidth + 'px';
       sc.style.marginLeft = Math.max(0, (box.clientWidth - 24 - pg.offsetWidth * k) / 2) + 'px';
@@ -494,7 +497,7 @@ function viewSettings(c) {
       <div class="grid g3"><label class="field"><span>${t('vatRate')}</span><input class="inp num" data-s="vatRate" data-num value="${s.vatRate}"></label>
         <label class="field"><span>${t('defaultVat')}</span><select class="inp" data-s="vatMode">${sel([['exclusive', t('vatEx')], ['inclusive', t('vatIn')], ['none', t('vatNone')]], s.vatMode)}</select></label>
         <label class="field"><span>${t('docLang')}</span><select class="inp" data-s="docLang">${sel([['th', t('langTh')], ['en', t('langEn')], ['both', t('langBoth')]], s.docLang)}</select></label></div>
-      <div style="display:flex;gap:24px;flex-wrap:wrap"><label class="switch"><input type="checkbox" data-s="buddhistYear" ${s.buddhistYear ? 'checked' : ''}><i></i>${t('buddhistYear')}</label><label class="switch"><input type="checkbox" data-s="showQR" ${s.showQR !== false ? 'checked' : ''}><i></i>${t('showQR')}</label><label class="switch"><input type="checkbox" data-s="printCopy" ${s.printCopy ? 'checked' : ''}><i></i>${t('showCopyTag')}</label><label class="switch"><input type="checkbox" data-s="a5OnA4" ${s.a5OnA4 !== false ? 'checked' : ''}><i></i>${t('a5OnA4')}</label></div>
+      <div style="display:flex;gap:24px;flex-wrap:wrap"><label class="switch"><input type="checkbox" data-s="buddhistYear" ${s.buddhistYear ? 'checked' : ''}><i></i>${t('buddhistYear')}</label><label class="switch"><input type="checkbox" data-s="showQR" ${s.showQR !== false ? 'checked' : ''}><i></i>${t('showQR')}</label><label class="switch"><input type="checkbox" data-s="printCopy" ${s.printCopy ? 'checked' : ''}><i></i>${t('showCopyTag')}</label><label class="switch"><input type="checkbox" data-s="a5OnA4" ${s.a5OnA4 !== false ? 'checked' : ''}><i></i>${t('a5OnA4')}</label><label class="switch"><input type="checkbox" data-s="crispText" ${s.crispText !== false ? 'checked' : ''}><i></i>${t('crispText')}</label></div>
       <div class="field num-set"><span>${t('numbering')}</span>
         <div class="grid g2"><label class="field"><small>${t('numFormat')}</small><input class="inp" id="num-fmt" data-s="numFormat" value="${esc(s.numFormat || '{PREFIX}{YY}{MM}-{####}')}" spellcheck="false"></label>
           <label class="field"><small>${t('numPreset')}</small><select class="inp" id="num-preset">${sel([['', '—'], ...NUM_PRESETS.map(([f, ex]) => [f, ex])], NUM_PRESETS.some(p => p[0] === s.numFormat) ? s.numFormat : '')}</select></label></div>
@@ -511,7 +514,7 @@ function viewSettings(c) {
       <label class="field" style="max-width:320px"><span>${t('uiFont')}</span><select class="inp" data-uifont>${sel(Object.keys(FONTS).map(k => [k, FONT_LABELS[k]]), S.settings.uiFont || 'plex')}</select></label>
       <div class="field"><span>${t('uiLang')}</span><div class="seg" style="align-self:flex-start"><button data-act="lang" data-v="th" class="${LANG === 'th' ? 'on' : ''}">ไทย</button><button data-act="lang" data-v="en" class="${LANG === 'en' ? 'on' : ''}">English</button></div></div>
       <div class="field"><span>${t('backup')}</span><small>${t('backupHint')}</small><div style="display:flex;gap:10px;flex-wrap:wrap;margin-top:6px"><button class="btn" data-act="export">${ico('download', 16)}${t('exportBackup')}</button><button class="btn" data-act="import">${ico('upload', 16)}${t('importBackup')}</button><button class="btn" data-act="sample">${ico('sparkle', 16)}${t('loadSample')}</button>${window.bestinvoiceNative ? `<button class="btn" data-act="openbackups">${ico('layers', 16)}${LANG === 'th' ? 'เปิดโฟลเดอร์สำรองอัตโนมัติ' : 'Open auto-backup folder'}</button>` : ''}<button class="btn danger" data-act="reset">${ico('trash', 16)}${t('resetAll')}</button></div></div>
-      <div class="hint">Bestinvoice 1.11 · macOS · Windows · ${LANG === 'th' ? 'ใช้งานได้แบบออฟไลน์' : 'Works offline'}</div>
+      <div class="hint">Bestinvoice 1.12 · macOS · Windows · ${LANG === 'th' ? 'ใช้งานได้แบบออฟไลน์' : 'Works offline'}</div>
     </div></div>
   </div>`;
   $$('[data-grow]', c).forEach(autoGrow);

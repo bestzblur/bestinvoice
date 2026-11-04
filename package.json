@@ -1,6 +1,6 @@
 {
   "name": "bestinvoice",
-  "version": "1.11.0",
+  "version": "1.12.0",
   "description": "Bestinvoice — Thai/English receipt, tax invoice, invoice & quotation maker for Windows, macOS and the browser",
   "scripts": {
     "build": "node build.js",
