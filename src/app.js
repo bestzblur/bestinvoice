@@ -362,6 +362,7 @@ function renderPreview(now) {
     const box = $('#pv'), sc = $('#pv-scale'); if (!box || !UI.ed) return;
     const d = UI.ed.doc, tpl = templateFor(d);
     buildPages(sc, d, tpl, { copy: S.settings.printCopy ? 'original' : null });
+    const sheet = sheetFor(tpl); if (sheet) sc.innerHTML = wrapSheets(sc.innerHTML, sheet); // show exactly what comes out of the printer
     const pages = [...sc.children]; pages.forEach((pg, i) => { pg.style.boxShadow = '0 4px 18px rgba(0,0,0,.1)'; if (i) pg.style.marginTop = '24px'; });
     const page = pages[0]; const total = sc.scrollHeight;
     const k = (box.clientWidth - 36) / page.offsetWidth;
@@ -390,12 +391,14 @@ function convertDoc(d, type) {
 const PRINT_SIZES = { A4: ['A4', false], A4L: ['A4', true], A5: ['A5', false], A5L: ['A5', true] };
 async function openPrintDialog(doc, withCopy) {
   const tpl = templateFor(doc);
-  const { pw, ph } = printDoc(doc, withCopy);
+  const { pw, ph, sheet } = printDoc(doc, withCopy);
   const pages = $('#print-root').innerHTML;
+  const PS = () => { const s = sheetFor(tpl); if (s) return { pageSize: s.pageSize, landscape: s.landscape }; const ps = PRINT_SIZES[tpl.paper]; return { landscape: ps ? ps[1] : false, pageSize: ps ? ps[0] : { width: Math.round(pw * 1000), height: Math.round(ph * 1000) } }; };
   let printers = []; try { printers = await window.bestinvoiceNative.getPrinters() || []; } catch (e) {}
   const def = (printers.find(p => p.name === S.settings.printer) || printers.find(p => p.isDefault) || printers[0] || {}).name || '';
-  const nPages = $$('#print-root .page').length;
-  const paperName = paperLabel(tpl.paper);
+  const nPages = $$('#print-root > *').length;
+  const paperName = sheet ? (sheet.dir === 'col' ? t('sheetA4Top') : t('sheetA4Left')) : paperLabel(tpl.paper);
+  const canHalf = tpl.paper === 'A5' || tpl.paper === 'A5L';
   modal({ title: t('printTitle'), wide: true, saveLabel: t('print'),
     body: `<div class="pd"><div class="pd-prev"><div class="pd-scale" id="pd-scale">${pages}</div></div>
       <div class="pd-opt">
@@ -403,20 +406,21 @@ async function openPrintDialog(doc, withCopy) {
         <div class="grid g2"><label class="field"><span>${t('copies')}</span><input class="inp num" id="pd-copies" type="number" min="1" max="99" value="1"></label>
           <label class="field"><span>${t('colorMode')}</span><select class="inp" id="pd-color">${sel([['1', t('colorOn')], ['0', t('colorOff')]], S.settings.printColor === false ? '0' : '1')}</select></label></div>
         <div class="pd-paper">${ico('file', 16)}<div><b>${esc(paperName)}</b><small>${t('paperAuto')}</small></div></div>
-        <div class="hint">${t('paperHint', { p: esc(paperName.replace(/ \(.*\)/, '')) })} · ${nPages} ${LANG === 'en' ? 'page(s)' : 'หน้า'}</div>
+        ${canHalf ? `<label class="switch" style="font-size:13px"><input type="checkbox" id="pd-half" ${sheet ? 'checked' : ''}><i></i>${t('a5OnA4')}</label>` : ''}
+        <div class="hint">${t('paperHint', { p: sheet ? 'A4' : esc(paperName.replace(/ \(.*\)/, '')) })} · ${nPages} ${LANG === 'en' ? 'sheet(s)' : 'แผ่น'}${sheet && withCopy ? ' · ' + t('copyBottom') : ''}</div>
         <div style="display:flex;gap:8px;flex-wrap:wrap"><button class="btn sm" id="pd-pdf">${ico('pdf', 15)}${t('savePdf')}</button><button class="btn sm ghost" id="pd-sys">${t('systemDialog')}</button></div>
       </div></div>`,
     onOpen: ov => {
-      const sc = $('#pd-scale', ov), box = sc.parentElement, pg = sc.querySelector('.page');
-      const k = Math.min(1, (box.clientWidth - 24) / pg.offsetWidth); sc.style.transform = `scale(${k})`; sc.style.width = pg.offsetWidth + 'px';
+      const sc = $('#pd-scale', ov), box = sc.parentElement, pg = sc.firstElementChild;
+      const half = $('#pd-half', ov); if (half) half.onchange = () => { S.settings.a5OnA4 = half.checked; save(); ov.remove(); openPrintDialog(doc, withCopy); if (UI.view === 'editor') renderPreview(true); };
+      const k = Math.min(1, (box.clientWidth - 24) / pg.offsetWidth, 536 / pg.offsetHeight); sc.style.transform = `scale(${k})`; sc.style.width = pg.offsetWidth + 'px';
+      sc.style.marginLeft = Math.max(0, (box.clientWidth - 24 - pg.offsetWidth * k) / 2) + 'px';
       box.style.height = Math.min(560, sc.scrollHeight * k + 24) + 'px';
       $('#pd-pdf', ov).onclick = () => { ov.remove(); savePdf(doc); };
-      $('#pd-sys', ov).onclick = async () => { ov.remove(); printDoc(doc, withCopy); const ps = PRINT_SIZES[tpl.paper]; await window.bestinvoiceNative.print({ dialog: true, landscape: ps ? ps[1] : false, pageSize: ps ? ps[0] : { width: Math.round(pw * 1000), height: Math.round(ph * 1000) } }); };
+      $('#pd-sys', ov).onclick = async () => { ov.remove(); printDoc(doc, withCopy); await window.bestinvoiceNative.print({ dialog: true, ...PS() }); };
     },
     onSave: ov => {
-      const ps = PRINT_SIZES[tpl.paper];
-      const opts = { deviceName: $('#pd-printer', ov) ? $('#pd-printer', ov).value : '', copies: Math.max(1, parseInt($('#pd-copies', ov).value) || 1), color: $('#pd-color', ov).value === '1',
-        landscape: ps ? ps[1] : false, pageSize: ps ? ps[0] : { width: Math.round(pw * 1000), height: Math.round(ph * 1000) } };
+      const opts = { deviceName: $('#pd-printer', ov) ? $('#pd-printer', ov).value : '', copies: Math.max(1, parseInt($('#pd-copies', ov).value) || 1), color: $('#pd-color', ov).value === '1', ...PS() };
       S.settings.printer = opts.deviceName; S.settings.printColor = opts.color; save();
       toast(t('printing'));
       printDoc(doc, withCopy);
@@ -490,7 +494,7 @@ function viewSettings(c) {
       <div class="grid g3"><label class="field"><span>${t('vatRate')}</span><input class="inp num" data-s="vatRate" data-num value="${s.vatRate}"></label>
         <label class="field"><span>${t('defaultVat')}</span><select class="inp" data-s="vatMode">${sel([['exclusive', t('vatEx')], ['inclusive', t('vatIn')], ['none', t('vatNone')]], s.vatMode)}</select></label>
         <label class="field"><span>${t('docLang')}</span><select class="inp" data-s="docLang">${sel([['th', t('langTh')], ['en', t('langEn')], ['both', t('langBoth')]], s.docLang)}</select></label></div>
-      <div style="display:flex;gap:24px;flex-wrap:wrap"><label class="switch"><input type="checkbox" data-s="buddhistYear" ${s.buddhistYear ? 'checked' : ''}><i></i>${t('buddhistYear')}</label><label class="switch"><input type="checkbox" data-s="showQR" ${s.showQR !== false ? 'checked' : ''}><i></i>${t('showQR')}</label><label class="switch"><input type="checkbox" data-s="printCopy" ${s.printCopy ? 'checked' : ''}><i></i>${t('showCopyTag')}</label></div>
+      <div style="display:flex;gap:24px;flex-wrap:wrap"><label class="switch"><input type="checkbox" data-s="buddhistYear" ${s.buddhistYear ? 'checked' : ''}><i></i>${t('buddhistYear')}</label><label class="switch"><input type="checkbox" data-s="showQR" ${s.showQR !== false ? 'checked' : ''}><i></i>${t('showQR')}</label><label class="switch"><input type="checkbox" data-s="printCopy" ${s.printCopy ? 'checked' : ''}><i></i>${t('showCopyTag')}</label><label class="switch"><input type="checkbox" data-s="a5OnA4" ${s.a5OnA4 !== false ? 'checked' : ''}><i></i>${t('a5OnA4')}</label></div>
       <div class="field"><span>${t('numbering')}</span><div class="grid g4">${['receipt', 'taxreceipt', 'invoice', 'quotation'].map(ty => `<label class="field"><small>${t(ty)}</small><input class="inp" data-s="prefixes.${ty}" value="${esc(s.prefixes[ty])}"></label>`).join('')}</div><small id="num-hint">${t('numberingHint', { x: nextNumber('receipt') })}</small></div>
       <div class="grid g2">${['receipt', 'taxreceipt', 'invoice', 'quotation'].map(ty => `<label class="field"><span>${t('defaultNotes')} — ${t(ty)}</span><textarea class="inp" rows="2" data-s="notes.${ty}">${esc(s.notes[ty])}</textarea></label>`).join('')}</div>
     </div></div>
@@ -499,7 +503,7 @@ function viewSettings(c) {
       <label class="field" style="max-width:320px"><span>${t('uiFont')}</span><select class="inp" data-uifont>${sel(Object.keys(FONTS).map(k => [k, FONT_LABELS[k]]), S.settings.uiFont || 'plex')}</select></label>
       <div class="field"><span>${t('uiLang')}</span><div class="seg" style="align-self:flex-start"><button data-act="lang" data-v="th" class="${LANG === 'th' ? 'on' : ''}">ไทย</button><button data-act="lang" data-v="en" class="${LANG === 'en' ? 'on' : ''}">English</button></div></div>
       <div class="field"><span>${t('backup')}</span><small>${t('backupHint')}</small><div style="display:flex;gap:10px;flex-wrap:wrap;margin-top:6px"><button class="btn" data-act="export">${ico('download', 16)}${t('exportBackup')}</button><button class="btn" data-act="import">${ico('upload', 16)}${t('importBackup')}</button><button class="btn" data-act="sample">${ico('sparkle', 16)}${t('loadSample')}</button>${window.bestinvoiceNative ? `<button class="btn" data-act="openbackups">${ico('layers', 16)}${LANG === 'th' ? 'เปิดโฟลเดอร์สำรองอัตโนมัติ' : 'Open auto-backup folder'}</button>` : ''}<button class="btn danger" data-act="reset">${ico('trash', 16)}${t('resetAll')}</button></div></div>
-      <div class="hint">Bestinvoice 1.7 · macOS · Windows · ${LANG === 'th' ? 'ใช้งานได้แบบออฟไลน์' : 'Works offline'}</div>
+      <div class="hint">Bestinvoice 1.8 · macOS · Windows · ${LANG === 'th' ? 'ใช้งานได้แบบออฟไลน์' : 'Works offline'}</div>
     </div></div>
   </div>`;
   $$('[data-grow]', c).forEach(autoGrow);

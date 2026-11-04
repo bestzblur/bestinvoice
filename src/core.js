@@ -348,7 +348,7 @@ function blankState() {
   return {
     version: 1,
     settings: {
-      lang: 'th', theme: 'minimal', showQR: true, vatRate: 7, vatMode: 'exclusive', buddhistYear: true, docLang: 'both', defaultTemplate: tpl.id, printCopy: false,
+      lang: 'th', theme: 'minimal', showQR: true, a5OnA4: true, vatRate: 7, vatMode: 'exclusive', buddhistYear: true, docLang: 'both', defaultTemplate: tpl.id, printCopy: false,
       prefixes: { receipt: 'RC', taxreceipt: 'RT', invoice: 'IV', quotation: 'QT' },
       notes: { receipt: '', taxreceipt: '', invoice: 'กรุณาชำระเงินภายในวันที่ครบกำหนด', quotation: 'ใบเสนอราคานี้มีอายุ 30 วัน' },
       company: { nameTh: '', nameEn: '', taxId: '', branch: '', address: '', phone: '', email: '', website: '', logo: '', signature: '' }

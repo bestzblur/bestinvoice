@@ -271,6 +271,9 @@ input[type=color].inp{padding:3px;height:34px;cursor:pointer}
   #print-root{display:block}
   #print-root .page{box-shadow:none!important;break-after:page;page-break-after:always}
   #print-root .page:last-child{break-after:auto;page-break-after:auto}
+  #print-root .sheet{break-after:page;page-break-after:always;box-shadow:none!important}
+  #print-root .sheet:last-child{break-after:auto;page-break-after:auto}
+  #print-root .sheet .page{break-after:auto!important;page-break-after:auto!important}
 }
 
 /* ---------- responsive ---------- */
@@ -434,3 +437,10 @@ input[type=color].inp{padding:3px;height:34px;cursor:pointer}
 .page table.it.tight td{padding-top:.9mm;padding-bottom:.9mm}
 .page table.it.tight th{padding-top:1mm;padding-bottom:1mm}
 .page table.it.book.tight td{padding-top:1mm;padding-bottom:.6mm}
+
+/* A5 on half an A4 sheet */
+.sheet{position:relative;background:#fff;display:flex;overflow:hidden}
+.sheet.col{flex-direction:column}.sheet.row{flex-direction:row}
+.sheet .page{flex:none;box-shadow:none!important}
+.sheet.col .cutline{border-top:.25mm dashed #b5b5b5;width:100%;flex:none}
+.sheet.row .cutline{border-left:.25mm dashed #b5b5b5;height:100%;flex:none}

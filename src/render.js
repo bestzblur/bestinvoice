@@ -360,6 +360,21 @@ function buildPages(container, doc, tpl, opts = {}) {
 function templateFor(doc) { return S.templates.find(x => x.id === doc.templateId) || S.templates.find(x => x.id === S.settings.defaultTemplate) || S.templates[0]; }
 
 /* Print one document (optionally original + copy) */
+/* A5 bills print on half of an A4 sheet (A5 landscape -> top half of A4 portrait; A5 portrait -> left half of A4 landscape) */
+function sheetFor(tpl) {
+  if (S.settings.a5OnA4 === false) return null;
+  if (tpl.paper === 'A5L') return { w: 210, h: 297, dir: 'col', pageSize: 'A4', landscape: false };
+  if (tpl.paper === 'A5') return { w: 297, h: 210, dir: 'row', pageSize: 'A4', landscape: true };
+  return null;
+}
+function wrapSheets(html, sheet) {
+  const tmp = document.createElement('div'); tmp.innerHTML = html; const pages = [...tmp.children]; let out = '';
+  for (let i = 0; i < pages.length; i += 2) {
+    const two = pages.slice(i, i + 2);
+    out += `<div class="sheet ${sheet.dir}" style="width:${sheet.w}mm;height:${sheet.h}mm">${two.map(p => p.outerHTML).join('<div class="cutline"></div>')}</div>`;
+  }
+  return out;
+}
 function printDoc(doc, withCopy) {
   const tpl = templateFor(doc);
   const root = $('#print-root');
@@ -367,6 +382,8 @@ function printDoc(doc, withCopy) {
   root.style.cssText = 'display:block;position:absolute;left:-10000px;top:0';
   let html = '';
   for (const c of copies) { const tmp = document.createElement('div'); root.innerHTML = ''; root.appendChild(tmp); buildPages(tmp, doc, tpl, { copy: c }); html += tmp.innerHTML; }
+  const sheet = sheetFor(tpl);
+  if (sheet) { root.innerHTML = wrapSheets(html, sheet); $('#page-style').textContent = `@page{size:${sheet.w}mm ${sheet.h}mm;margin:0}`; root.style.cssText = ''; return { pw: sheet.w, ph: sheet.h, sheet }; }
   root.innerHTML = html;
   const [pw, ph0] = PAPERS[tpl.paper]; const first = root.querySelector('.page');
   const ph = tpl.paper === '80mm' ? Math.ceil(first.offsetHeight / (first.offsetWidth / pw)) : ph0;
